@@ -31,7 +31,6 @@ header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; j
 
 .notice { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
 .notice b { font-weight: 600; }
-.notice.info { background: var(--surface2); color: var(--ink); }
 
 .grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } }
@@ -65,18 +64,15 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
   border: 1.5px solid var(--accent); color: var(--accent); padding: 2px 8px; border-radius: 3px;
 }
 .pred { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--line); padding-top: 12px; }
-.pred .big { font-size: 20px; font-weight: 600; }
-.bar { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
-.bar > i { display: block; height: 100%; background: var(--accent); }
-.bar.late > i { background: var(--bad); }
+.pred .big { font-size: 18px; font-weight: 600; }
 .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .pill.ok { background: var(--ok-bg); color: var(--ok); }
 .pill.warn { background: var(--warn-bg); color: var(--warn); }
 .pill.bad { background: var(--bad-bg); color: var(--bad); }
 .pill.neutral { background: var(--surface2); color: var(--muted); }
 
-.steps { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.steps li { flex: 1 1 0; min-width: 28px; height: 6px; border-radius: 3px; background: var(--surface2); }
+.steps { display: flex; flex-wrap: wrap; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.steps li { flex: 1 1 0; min-width: 14px; height: 6px; border-radius: 3px; background: var(--surface2); }
 .steps li.done { background: var(--accent); }
 .steps li.now { background: var(--accent); opacity: .5; }
 
@@ -141,10 +137,76 @@ const HIGH_WAGE_JOB_OPTIONS = [
   { val: 100, label: 'มี Job Offer High-wage Tier 3 (+100)' }
 ];
 
-const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
-const minOf = (arr) => Math.min(...arr.map((v) => clamp(Math.round(num(v)), 0, 10)));
-const lvl = (v) => clamp(Math.round(num(v)), 0, 10);
+const EE_STAGES = [
+  { label: 'เตรียมเอกสารตั้งต้น', win: [14, 30] },
+  { label: 'สร้างโปรไฟล์ EE (อยู่ใน Pool)', win: null, mode: 'ee-pool' },
+  { label: 'ได้รับ ITA แล้ว', win: [14, 60], deadline: 60, hint: 'ต้องยื่น PR ภายใน 60 วันหลังได้ ITA' },
+  { label: 'ตรวจสุขภาพ (Upfront Medical)', win: [7, 30] },
+  { label: 'ขอใบรับรองความประพฤติ (PCC)', win: [14, 45] },
+  { label: 'รวบรวมเอกสารการทำงานและสลิป', win: [7, 30] },
+  { label: 'ส่งใบสมัคร e-APR (รอรับ AOR)', win: [1, 14] },
+  { label: 'เก็บข้อมูลชีวมิติ (Biometrics)', win: [14, 30] },
+  { label: 'ตรวจสอบคุณสมบัติ (Eligibility)', win: [60, 150] },
+  { label: 'ตรวจสอบประวัติ (Background Check)', win: [60, 150] },
+  { label: 'ได้รับอีเมลเชิญเข้า PR Portal (PPR)', win: [14, 45] },
+  { label: 'ตอบกลับ Portal ขั้นตอนที่ 1 (P1)', win: [1, 7] },
+  { label: 'อัปโหลดรูปและที่อยู่ (P2)', win: [3, 14] },
+  { label: 'ได้รับ eCOPR', win: [7, 21] },
+  { label: 'ได้รับบัตร PR Card ตัวจริง', win: [30, 90], final: true }
+];
+
+const PROGRAMS = {
+  ee: { name: 'Express Entry (Granular Track)', stages: EE_STAGES },
+  bc: { name: 'BC PNP', stages: [
+    { label: 'ลงทะเบียน SIRS รอ invitation', win: null, mode: 'bc-pool' },
+    { label: 'ได้รับ invitation แล้ว', win: [7, 25], deadline: 25 },
+    { label: 'ยื่นใบสมัคร BC PNP', win: [60, 90] },
+    { label: 'ได้ nomination', win: [14, 60] },
+    { label: 'ยื่น PR ที่ IRCC', win: [150, 210] },
+    { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true }
+  ]},
+  oinp: { name: 'OINP (Ontario)', stages: [
+    { label: 'เตรียมเอกสาร', win: null, mode: 'oinp-prep' },
+    { label: 'ยื่นใบสมัคร OINP', win: [30, 90] },
+    { label: 'ได้ nomination', win: [14, 60], deadline: 180 },
+    { label: 'ยื่น PR ที่ IRCC', win: [180, 240] },
+    { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true }
+  ]}
+};
+const DEFAULT_STREAM = { ee: '', bc: 'si', oinp: 'hc' };
+
+const EE_REF = [
+  { cat: 'Provincial Nominee Program', date: '2026-09-28', crs: 725, ita: 733 },
+  { cat: 'Canadian Experience Class', date: '2026-09-29', crs: 518, ita: 2000 },
+  { cat: 'Trades occupations', date: '2026-10-01', crs: 476, ita: 3500 },
+  { cat: 'Healthcare & social services', date: '2026-09-04', crs: 475, ita: 3500 },
+];
+const EE_CLUSTER_ANCHOR = '2026-09-28';
+const EE_CLUSTER_GAP = 14;
+const BC_REF = [
+  { cat: 'Skilled Worker', date: '2026-06-04', score: 95 },
+  { cat: 'Tech Pilot', date: '2026-06-04', score: 85 },
+  { cat: 'International Graduate', date: '2026-05-21', score: 88 },
+];
+
+const DAY = 86400000;
+function parseD(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
+function fmtISO(d) { const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function todayD() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+function diffDays(a, b) { return Math.round((a - b) / DAY); }
+function fmtTH(d) { return d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function fmtSpan(a, b) {
+  const y = a.getFullYear() === b.getFullYear();
+  const f = (d, withY) => d.toLocaleDateString('th-TH-u-ca-gregory', withY ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
+  return f(a, !y) + ' – ' + f(b, true);
+}
+function dur(days) {
+  if (days < 45) return days + ' วัน';
+  const m = days / 30.4;
+  return (Math.round(m * 2) / 2) + ' เดือน';
+}
+function winOf(stage, t) { return typeof stage.win === 'function' ? stage.win(t) : stage.win; }
 
 function calcAgeOnDate(dobStr, targetDateStr) {
   if (!dobStr) return null;
@@ -153,9 +215,7 @@ function calcAgeOnDate(dobStr, targetDateStr) {
   if (isNaN(dob.getTime()) || isNaN(target.getTime())) return null;
   let age = target.getFullYear() - dob.getFullYear();
   const m = target.getMonth() - dob.getMonth();
-  if (m < 0 || (m === 0 && target.getDate() < dob.getDate())) {
-    age--;
-  }
+  if (m < 0 || (m === 0 && target.getDate() < dob.getDate())) age--;
   return age;
 }
 
@@ -193,13 +253,6 @@ function l2Pts(clb) {
   if (c >= 5) return 1;
   return 0;
 }
-function spLangPts(clb) {
-  const c = lvl(clb);
-  if (c >= 9) return 5;
-  if (c >= 7) return 3;
-  if (c >= 5) return 1;
-  return 0;
-}
 function eduTier(i) { return i >= 5 ? 2 : i >= 2 ? 1 : 0; }
 
 function computeCRS(p) {
@@ -227,7 +280,7 @@ function computeCRS(p) {
 
   let spouse = 0;
   if (sp) {
-    spouse = SP_EDU[clamp(num(p.spEdu), 0, 7)] + p.spL.reduce((s, v) => s + spLangPts(v), 0) + SP_CWE[clamp(num(p.spCwe), 0, 5)];
+    spouse = SP_EDU[clamp(num(p.spEdu), 0, 7)] + p.spL.reduce((s, v) => s + (lvl(v) >= 9 ? 5 : lvl(v) >= 7 ? 3 : lvl(v) >= 5 ? 1 : 0), 0) + SP_CWE[clamp(num(p.spCwe), 0, 5)];
     spouse = Math.min(40, spouse);
   }
 
@@ -259,10 +312,7 @@ function computeCRS(p) {
   const sibling = p.sibling ? 15 : 0;
   const pnp = p.pnp ? 600 : 0;
   
-  const highWageExpPts = num(p.highWageExp || 0);
-  const highWageJobPts = num(p.highWageJob || 0);
-  const selectedHighWageBonus = Math.max(highWageExpPts, highWageJobPts);
-
+  const selectedHighWageBonus = Math.max(num(p.highWageExp || 0), num(p.highWageJob || 0));
   const additional = Math.min(600, french + study + sibling + pnp + selectedHighWageBonus);
 
   return {
@@ -273,79 +323,10 @@ function computeCRS(p) {
   };
 }
 
-const PROGRAMS = {
-  ee: {
-    name: 'Express Entry',
-    streams: null,
-    stages: [
-      { label: 'อยู่ใน pool รอ ITA', win: null, mode: 'ee-pool' },
-      { label: 'ได้รับ ITA แล้ว', win: [14, 60], deadline: 60, hint: 'ต้องยื่น PR ภายใน 60 วันหลังได้ ITA' },
-      { label: 'ยื่น PR แล้ว (รอ AOR)', win: [1, 14] },
-      { label: 'ได้ AOR แล้ว (รอชีวมิติ/ตรวจสุขภาพ)', win: [20, 60] },
-      { label: 'ชีวมิติ/ตรวจสุขภาพเสร็จ (รอตรวจสอบ)', win: [60, 150] },
-      { label: 'ได้ PPR / ขั้นสุดท้าย', win: [14, 45] },
-      { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true },
-    ],
-  },
-  bc: {
-    name: 'BC PNP',
-    streams: { si: 'Skills Immigration (SI)', eebc: 'Express Entry BC (EEBC)' },
-    stages: [
-      { label: 'ลงทะเบียน SIRS แล้ว รอ invitation', win: null, mode: 'bc-pool' },
-      { label: 'ได้รับ invitation แล้ว', win: [7, 25], deadline: 25, hint: 'ยื่นใบสมัคร BC PNP ภายใน 25 วัน' },
-      { label: 'ยื่นใบสมัคร BC PNP แล้ว', win: [60, 90] },
-      { label: 'ได้ nomination แล้ว (ยังไม่ยื่น PR)', win: [14, 60] },
-      { label: 'ยื่น PR ที่ IRCC แล้ว', win: (t) => (t.stream === 'eebc' ? [150, 210] : [360, 540]) },
-      { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true },
-    ],
-  },
-  oinp: {
-    name: 'OINP / ONIP (Ontario)',
-    streams: { hc: 'Human Capital (Masters/PhD/HCP)', ejo: 'Employer Job Offer', biz: 'Business' },
-    stages: [
-      { label: 'เตรียมเอกสาร / ตรวจคุณสมบัติ', win: null, mode: 'oinp-prep' },
-      { label: 'ยื่นใบสมัคร OINP แล้ว', win: (t) => ({ hc: [60, 90], ejo: [30, 60], biz: [60, 120] }[t.stream] || [30, 90]) },
-      { label: 'ได้ nomination แล้ว (ยังไม่ยื่น PR)', win: [14, 60], deadline: 180, hint: 'ต้องยื่น PR ภายใน 6 เดือนหลัง nomination' },
-      { label: 'ยื่น PR ที่ IRCC แล้ว', win: [180, 240] },
-      { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true },
-    ],
-  },
-};
-const DEFAULT_STREAM = { ee: '', bc: 'si', oinp: 'hc' };
-
-const EE_REF = [
-  { cat: 'Provincial Nominee Program', date: '2026-09-28', crs: 725, ita: 733 },
-  { cat: 'Canadian Experience Class', date: '2026-09-29', crs: 518, ita: 2000 },
-  { cat: 'Trades occupations', date: '2026-10-01', crs: 476, ita: 3500 },
-  { cat: 'Healthcare & social services', date: '2026-09-04', crs: 475, ita: 3500 },
-];
-const EE_CLUSTER_ANCHOR = '2026-09-28';
-const EE_CLUSTER_GAP = 14;
-const BC_REF = [
-  { cat: 'Skilled Worker', date: '2026-06-04', score: 95 },
-  { cat: 'Tech Pilot', date: '2026-06-04', score: 85 },
-  { cat: 'International Graduate', date: '2026-05-21', score: 88 },
-  { cat: 'Skilled Worker (สูงสุดในช่วง เม.ย.)', date: '2026-04-23', score: 108 },
-];
-
-const DAY = 86400000;
-function parseD(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
-function fmtISO(d) { const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
-function todayD() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
-function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
-function diffDays(a, b) { return Math.round((a - b) / DAY); }
-function fmtTH(d) { return d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' }); }
-function fmtSpan(a, b) {
-  const y = a.getFullYear() === b.getFullYear();
-  const f = (d, withY) => d.toLocaleDateString('th-TH-u-ca-gregory', withY ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
-  return f(a, !y) + ' – ' + f(b, true);
-}
-function dur(days) {
-  if (days < 45) return days + ' วัน';
-  const m = days / 30.4;
-  return (Math.round(m * 2) / 2) + ' เดือน';
-}
-function winOf(stage, t) { return typeof stage.win === 'function' ? stage.win(t) : stage.win; }
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const minOf = (arr) => Math.min(...arr.map((v) => clamp(Math.round(num(v)), 0, 10)));
+const lvl = (v) => clamp(Math.round(num(v)), 0, 10);
 
 function predict(t, crsTotal) {
   const prog = PROGRAMS[t.program];
@@ -471,64 +452,38 @@ function deadlinePill(p) {
 function eePoolHtml(p, t) {
   const s = p.score;
   const prof = cur();
-  const cec = EE_REF[1].crs, trades = EE_REF[2].crs, hc = EE_REF[3].crs, pnp = EE_REF[0].crs;
-  let verdict;
-  if (prof.pnp) {
-    verdict = s >= pnp
-      ? '<span class="pill ok">คะแนนรวม ' + s + ' สูงกว่า cutoff PNP ล่าสุด (' + pnp + ')</span>'
-      : '<span class="pill warn">คะแนนรวม ' + s + ' ต่ำกว่า cutoff PNP ล่าสุด (' + pnp + ') อยู่ ' + (pnp - s) + ' คะแนน</span>';
-  } else if (s >= cec) {
-    verdict = '<span class="pill ok">' + s + ' สูงกว่า cutoff CEC ล่าสุด (' + cec + ') ถ้าเข้าเกณฑ์ CEC มีโอกาสในรอบถัดไป</span>';
-  } else if (s >= Math.min(trades, hc)) {
-    verdict = '<span class="pill warn">' + s + ' ต่ำกว่า CEC (' + cec + ') อยู่ ' + (cec - s) + ' คะแนน แต่ผ่าน cutoff สาย trades/healthcare ถ้าอาชีพตรง category</span>';
-  } else {
-    verdict = '<span class="pill bad">' + s + ' ต่ำกว่า cutoff ทุกสายใน draw ล่าสุด (CEC ' + cec + ' ขาดอีก ' + (cec - s) + ')</span>';
-  }
+  const cec = EE_REF[1].crs, pnp = EE_REF[0].crs;
+  let verdict = s >= cec ? '<span class="pill ok">คะแนนสูงกว่า cutoff CEC ล่าสุด (' + cec + ') มีโอกาสสูงในรอบถัดไป</span>' : '<span class="pill bad">คะแนนต่ำกว่า CEC cutoff ล่าสุด (' + cec + ')</span>';
   return '<div class="big">รอบ draw ถัดไปคาดว่า ~' + fmtTH(p.nextDraw) + '</div>' +
     '<div>' + verdict + '</div>' +
-    '<div class="sub">ใช้คะแนนของ "' + esc(prof.name) + '" เทียบ ตัวเลขรอบล่าสุดเป็นประมาณการ ไม่ใช่ตารางทางการ หลังได้ ITA ปกติใช้เวลาอีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
+    '<div class="sub">หลังได้ ITA ปกติใช้เวลาอีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
 }
 
 function bcPoolHtml(p, t) {
   const v = t.sirs === '' ? null : Number(t.sirs);
-  let verdict;
-  if (v == null || !Number.isFinite(v)) verdict = '<span class="pill neutral">ใส่คะแนน SIRS เพื่อเทียบกับ cutoff</span>';
-  else if (v >= 108) verdict = '<span class="pill ok">SIRS ' + v + ' ระดับสูงสุดของ cutoff ที่เคยประกาศในปีนี้ (108)</span>';
-  else if (v >= 95) verdict = '<span class="pill ok">SIRS ' + v + ' เทียบเท่า cutoff Skilled Worker ล่าสุด (95)</span>';
-  else if (v >= 80) verdict = '<span class="pill warn">SIRS ' + v + ' อยู่ช่วงล่าง cutoff แต่ละสตรีมเคยอยู่ที่ 80–110 ขึ้นกับรอบและอาชีพ</span>';
-  else verdict = '<span class="pill bad">SIRS ' + v + ' ต่ำกว่าช่วง cutoff ที่เคยประกาศ (80–110)</span>';
-  return '<div class="big">invitation รอบถัดไปอยู่ในรอบ draw ราว 2 สัปดาห์</div>' +
-    '<div>' + verdict + '</div>' +
-    '<div class="sub">เวลารอจริงขึ้นกับคะแนนและสตรีมของคุณ หลังได้ invitation ปกติใช้อีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
+  let verdict = v == null ? '<span class="pill neutral">ใส่คะแนน SIRS</span>' : v >= 95 ? '<span class="pill ok">SIRS อยู่ในเกณฑ์ดีเยี่ยม</span>' : '<span class="pill warn">SIRS ต่ำกว่า cutoff เฉลี่ยเล็กน้อย</span>';
+  return '<div class="big">invitation รอบถัดไปใน 2 สัปดาห์</div><div>' + verdict + '</div>';
 }
 
 function oinpPrepHtml(p, t) {
-  const w = winOf(PROGRAMS.oinp.stages[1], t);
-  return '<div class="big">ขั้นนี้ขึ้นกับความพร้อมของคุณ</div>' +
-    '<div class="sub">เมื่อยื่นใบสมัคร OINP แล้ว ให้เปลี่ยนขั้นตอนเป็น "ยื่นใบสมัคร" ปกติรอ nomination ราว ' + dur(w[0]) + ' – ' + dur(w[1]) + ' และจนถึง PR ราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + '</div>';
+  return '<div class="big">เตรียมความพร้อม OINP</div><div class="sub">เมื่อยื่นแล้วเปลี่ยนสถานะเพื่อติดตามเวลา</div>';
 }
 
 function predHtml(t) {
   const p = predict(t, computeCRS(cur()).total);
   const prog = PROGRAMS[t.program];
-  if (p.final) {
-    return '<span class="pill ok">เสร็จสิ้นแล้ว</span><div class="sub">ถึงขั้นสุดท้ายเมื่อ ' + fmtTH(p.since) + '</div>';
-  }
+  if (p.final) return '<span class="pill ok">เสร็จสิ้นสมบูรณ์แล้ว</span>';
   const next = prog.stages[p.idx + 1];
   let body = '';
   if (p.mode === 'ee-pool') body = eePoolHtml(p, t);
   else if (p.mode === 'bc-pool') body = bcPoolHtml(p, t);
   else if (p.mode === 'oinp-prep') body = oinpPrepHtml(p, t);
   else {
-    const label = p.state === 'early' ? '<span class="pill neutral">ยังไม่ถึงช่วงปกติ อีก ' + diffDays(p.from, todayD()) + ' วัน</span>'
-      : p.state === 'in' ? '<span class="pill ok">อยู่ในช่วงที่คาดไว้</span>'
-      : '<span class="pill bad">เกินช่วงปกติมา ' + diffDays(todayD(), p.to) + ' วัน</span>';
+    const label = p.state === 'early' ? '<span class="pill neutral">ยังไม่ถึงช่วงปกติ</span>' : p.state === 'in' ? '<span class="pill ok">อยู่ในช่วงเวลาปกติ</span>' : '<span class="pill bad">เกินช่วงปกติเล็กน้อย</span>';
     body = '<div class="big">ขั้นถัดไปคาดว่า ' + fmtSpan(p.from, p.to) + '</div>' +
       '<div>' + label + '</div>' +
-      '<div class="bar' + (p.state === 'late' ? ' late' : '') + '"><i style="width:' + p.pct + '%"></i></div>' +
-      '<div class="sub">ผ่านมา ' + p.elapsed + ' วัน จากช่วงปกติ ' + dur(p.window[0]) + ' – ' + dur(p.window[1]) + (next ? ' | ถัดไป: ' + esc(next.label) : '') + '</div>' +
-      '<div class="sub">ครบทั้งกระบวนการโดยประมาณ <span class="mono">' + fmtSpan(p.finish.from, p.finish.to) + '</span></div>';
-    if (p.state === 'late') body += '<div class="sub">ถ้านานกว่านี้มาก ลองตรวจสถานะในบัญชี IRCC หรือ portal ของจังหวัดก่อนติดต่อสอบถาม</div>';
+      '<div class="sub">ผ่านมา ' + p.elapsed + ' วันจากช่วงปกติ (' + dur(p.window[0]) + ' – ' + dur(p.window[1]) + ') ' + (next ? '| ถัดไป: ' + esc(next.label) : '') + '</div>' +
+      '<div class="sub">คาดการณ์สิ้นสุดกระบวนการ <span class="mono">' + fmtSpan(p.finish.from, p.finish.to) + '</span></div>';
   }
   const dl = deadlinePill(p);
   return body + (dl ? '<div>' + dl + '</div>' : '') + (p.st.hint ? '<div class="sub">' + esc(p.st.hint) + '</div>' : '');
@@ -538,67 +493,46 @@ function trackHtml(t) {
   const prog = PROGRAMS[t.program];
   const idx = Math.min(t.stage, prog.stages.length - 1);
   const dots = prog.stages.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '" title="' + esc(s.label) + '"></li>').join('');
-  const streamField = prog.streams
-    ? '<div class="field"><label class="label" for="' + t.id + '-stream">สตรีม</label><select id="' + t.id + '-stream" data-t="' + t.id + '" data-tf="stream">' +
-      Object.keys(prog.streams).map((k) => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>'
-    : '';
-  const sirs = t.program === 'bc'
-    ? '<div class="field"><label class="label" for="' + t.id + '-sirs">คะแนน SIRS ของคุณ (ถ้ามี)</label><input type="number" inputmode="numeric" min="0" max="200" id="' + t.id + '-sirs" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>'
-    : '';
-  const hist = (t.history || []).slice().reverse().map((h) => {
-    const s = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
-    return '<li><span class="mono">' + esc(h.date) + '</span> ' + esc(s.label) + '</li>';
-  }).join('');
-  return '<section class="card" aria-label="' + esc(prog.name) + '">' +
-    '<div class="card-head"><div><span class="stage-stamp">' + esc(prog.name) + '</span></div>' +
-    '<button class="btn ghost small" data-act="del-track" data-t="' + t.id + '" id="' + t.id + '-del">ลบ</button></div>' +
-    '<div class="row">' +
-    '<div class="field"><label class="label" for="' + t.id + '-prog">โปรแกรม</label><select id="' + t.id + '-prog" data-t="' + t.id + '" data-tf="program">' +
-    Object.keys(PROGRAMS).map((k) => opt(k, PROGRAMS[k].name, t.program)).join('') + '</select></div>' + streamField + '</div>' +
-    '<div class="row">' +
-    '<div class="field"><label class="label" for="' + t.id + '-stage">ตอนนี้อยู่ขั้นตอน</label><select id="' + t.id + '-stage" data-t="' + t.id + '" data-tf="stage">' +
-    prog.stages.map((s, i) => opt(i, (i + 1) + '. ' + s.label, idx)).join('') + '</select></div>' +
-    '<div class="field"><label class="label" for="' + t.id + '-date">วันที่อัปเดตสถานะนี้</label><input type="date" id="' + t.id + '-date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' +
-    sirs + '</div>' +
-    '<ol class="steps" aria-label="ความคืบหน้า ' + (idx + 1) + ' จาก ' + prog.stages.length + '">' + dots + '</ol>' +
+  const streamField = prog.streams ? '<div class="field"><label class="label">สตรีม</label><select data-t="' + t.id + '" data-tf="stream">' + Object.keys(prog.streams).map(k => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>' : '';
+  const sirs = t.program === 'bc' ? '<div class="field"><label class="label">SIRS</label><input type="number" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>' : '';
+  const hist = (t.history || []).slice().reverse().map(h => '<li><span class="mono">' + esc(h.date) + '</span> ' + esc(prog.stages[Math.min(h.stage, prog.stages.length - 1)].label) + '</li>').join('');
+  return '<section class="card">' +
+    '<div class="card-head"><div><span class="stage-stamp">' + esc(prog.name) + '</span></div><button class="btn ghost small" data-act="del-track" data-t="' + t.id + '">ลบ</button></div>' +
+    '<div class="row"><div class="field"><label class="label">โปรแกรม</label><select data-t="' + t.id + '" data-tf="program">' + Object.keys(PROGRAMS).map(k => opt(k, PROGRAMS[k].name, t.program)).join('') + '</select></div>' + streamField + '</div>' +
+    '<div class="row"><div class="field"><label class="label">ขั้นตอนปัจจุบัน (' + (idx + 1) + '/' + prog.stages.length + ')</label><select data-t="' + t.id + '" data-tf="stage">' + prog.stages.map((s, i) => opt(i, (i + 1) + '. ' + s.label, idx)).join('') + '</select></div>' +
+    '<div class="field"><label class="label">วันที่อัปเดต</label><input type="date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' + sirs + '</div>' +
+    '<ol class="steps">' + dots + '</ol>' +
     '<div class="pred" id="pred-' + t.id + '">' + predHtml(t) + '</div>' +
-    '<div class="field"><label class="label" for="' + t.id + '-note">บันทึก (เลข application, ข้อสังเกต)</label><textarea id="' + t.id + '-note" data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
-    '<details><summary>ประวัติการอัปเดต (' + (t.history || []).length + ')</summary><ul class="hist">' + (hist || '<li>ยังไม่มีประวัติ</li>') + '</ul></details>' +
-    '</section>';
+    '<div class="field"><label class="label">บันทึก</label><textarea data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
+    '<details><summary>ประวัติการอัปเดต</summary><ul class="hist">' + (hist || '<li>ไม่มี</li>') + '</ul></details></section>';
 }
 
 function trackListHtml() {
   const p = cur();
-  const cards = p.tracks.map(trackHtml).join('');
-  return (cards || '<div class="card"><div class="empty">ยังไม่มีรายการติดตามสำหรับ ' + esc(p.name) + ' กด "เพิ่มรายการติดตาม" เพื่อเริ่ม</div></div>') +
-    '<button class="btn primary" id="add-track" data-act="add-track">+ เพิ่มรายการติดตาม</button>';
+  return (p.tracks.map(trackHtml).join('') || '<div class="card"><div class="empty">ยังไม่มีรายการติดตาม</div></div>') +
+    '<button class="btn primary" data-act="add-track">+ เพิ่มรายการติดตาม</button>';
 }
 
 function refHtml() {
-  const ee = EE_REF.map((r) => '<tr><td>' + esc(r.cat) + '</td><td>' + r.date + '</td><td class="n">' + r.crs + '</td><td class="n">' + r.ita.toLocaleString('en-CA') + '</td></tr>').join('');
-  const bc = BC_REF.map((r) => '<tr><td>' + esc(r.cat) + '</td><td>' + r.date + '</td><td class="n">' + r.score + '</td></tr>').join('');
-  return '<details class="card"><summary>Cutoff ล่าสุดที่ใช้เทียบ</summary>' +
-    '<h3>Express Entry (draw ถึง 1 ต.ค. 2026)</h3><div class="scroll-x"><table class="ref"><thead><tr><th>Category</th><th>วันที่</th><th>CRS</th><th>ITA</th></tr></thead><tbody>' + ee + '</tbody></table></div>' +
-    '<h3>BC PNP SIRS (ปี 2026, ถึง 4 มิ.ย.)</h3><div class="scroll-x"><table class="ref"><thead><tr><th>Stream</th><th>วันที่</th><th>SIRS ขั้นต่ำ</th></tr></thead><tbody>' + bc + '</tbody></table></div>' +
-    '<div class="sub">ตัวเลขจากบทความข่าวสาธารณะ ตรวจ draw ล่าสุดที่ canada.ca และ workbc.ca ก่อนตัดสินใจ</div></details>';
+  const ee = EE_REF.map(r => '<tr><td>' + esc(r.cat) + '</td><td>' + r.date + '</td><td class="n">' + r.crs + '</td><td class="n">' + r.ita.toLocaleString() + '</td></tr>').join('');
+  return '<details class="card"><summary>Cutoff ล่าสุด</summary><div class="scroll-x"><table class="ref"><thead><tr><th>Category</th><th>วันที่</th><th>CRS</th><th>ITA</th></tr></thead><tbody>' + ee + '</tbody></table></div></details>';
 }
 
 const CWE_LABELS = ['น้อยกว่า 1 ปี', '1 ปี', '2 ปี', '3 ปี', '4 ปี', '5 ปีขึ้นไป'];
 const FW_LABELS = [[0, 'ไม่มี'], [1, '1–2 ปี'], [3, '3 ปีขึ้นไป']];
-const STUDY_LABELS = ['ไม่มี', 'วุฒิในแคนาดา 1–2 ปี', 'วุฒิในแคนาดา 3 ปีขึ้นไป'];
+const STUDY_LABELS = ['ไม่มี', 'วุฒิแคนาดา 1–2 ปี', 'วุฒิแคนาดา 3 ปีขึ้นไป'];
 const SKILLS = ['ฟัง', 'พูด', 'อ่าน', 'เขียน'];
 
 function clbRow(arr, f, ix, label) {
   return '<div class="field"><span class="label">' + label + '</span><div class="clb">' +
-    arr.map((v, k) => '<div class="field"><input type="number" inputmode="numeric" min="0" max="10" id="p' + ix + '-' + f + '-' + k + '" data-f="' + f + '" data-k="' + k + '" value="' + esc(v) + '" aria-label="' + label + ' ' + SKILLS[k] + '"><span>' + SKILLS[k] + '</span></div>').join('') +
+    arr.map((v, k) => '<div class="field"><input type="number" min="0" max="10" data-f="' + f + '" data-k="' + k + '" value="' + esc(v) + '"><span>' + SKILLS[k] + '</span></div>').join('') +
     '</div></div>';
 }
 function selectF(ix, f, label, options, val) {
-  return '<div class="field"><label class="label" for="p' + ix + '-' + f + '">' + label + '</label><select id="p' + ix + '-' + f + '" data-f="' + f + '">' +
-    options.map(([v, l]) => opt(v, l, val)).join('') + '</select></div>';
+  return '<div class="field"><label class="label">' + label + '</label><select data-f="' + f + '">' + options.map(([v, l]) => opt(v, l, val)).join('') + '</select></div>';
 }
 function checkF(ix, f, label, val) {
-  return '<div class="field check"><input type="checkbox" id="p' + ix + '-' + f + '" data-f="' + f + '"' + (val ? ' checked' : '') + '><label for="p' + ix + '-' + f + '">' + label + '</label></div>';
+  return '<div class="field check"><input type="checkbox" data-f="' + f + '"' + (val ? ' checked' : '') + '><label>' + label + '</label></div>';
 }
 
 function crsFormHtml() {
@@ -609,70 +543,43 @@ function crsFormHtml() {
   const nocOpts = NOC_CATEGORIES.map(c => [c.val, c.label]);
   const highWageExpOpts = HIGH_WAGE_EXP_OPTIONS.map(o => [o.val, o.label]);
   const highWageJobOpts = HIGH_WAGE_JOB_OPTIONS.map(o => [o.val, o.label]);
-  
-  let ageAutoTag = p.dob ? '<span class="auto-tag">ณ วันที่ประเมิน: ' + res.effectiveAge + ' ปี</span>' : '';
-  let cweAutoTag = p.caStartDate ? '<span class="auto-tag">ณ วันที่ประเมิน: ' + res.effectiveCwe + ' ปี</span>' : '';
 
-  let h = '<section class="card" aria-label="ข้อมูลโปรไฟล์">' +
-    '<div class="card-head"><h2>ข้อมูลโปรไฟล์ (Express Entry CRS)</h2></div>' +
-    '<div class="field"><label class="label" for="p' + ix + '-name">ชื่อโปรไฟล์</label><input type="text" id="p' + ix + '-name" data-f="name" maxlength="40" value="' + esc(p.name) + '"></div>' +
-    
-    '<h3>ตั้งค่าการคำนวณและประเมินอนาคต</h3>' +
-    '<div class="field"><label class="label" for="p' + ix + '-targetEvalDate">วันที่ประเมินคะแนน (ใส่วันในอนาคตเพื่อจำลองคะแนน ณ วันนั้น)</label><input type="date" id="p' + ix + '-targetEvalDate" data-f="targetEvalDate" value="' + esc(p.targetEvalDate) + '"></div>' +
-
-    '<h3>ข้อมูลส่วนบุคคลและการทำงาน</h3>' +
-    '<div class="row">' +
-    '<div class="field"><label class="label" for="p' + ix + '-dob">วันเกิด (คำนวณอายุอัตโนมัติตามวันที่ประเมิน)</label><input type="date" id="p' + ix + '-dob" data-f="dob" value="' + esc(p.dob) + '"></div>' +
-    '<div class="field"><label class="label" for="p' + ix + '-age">อายุ ' + ageAutoTag + '</label><input type="number" inputmode="numeric" min="17" max="60" id="p' + ix + '-age" data-f="age" value="' + esc(res.effectiveAge) + '"></div>' +
-    '</div>' +
-    
-    '<div class="row">' +
-    '<div class="field"><label class="label" for="p' + ix + '-caStartDate">วันเริ่มทำงานในแคนาดาวันแรก</label><input type="date" id="p' + ix + '-caStartDate" data-f="caStartDate" value="' + esc(p.caStartDate) + '"></div>' +
-    selectF(ix, 'cwe', 'ประสบการณ์ทำงานในแคนาดา' + cweAutoTag, CWE_LABELS.map((l, i) => [i, l]), res.effectiveCwe) +
-    '</div>' +
-
-    selectF(ix, 'nocCat', 'กลุ่มอาชีพตาม NOC / Category-based Selection', nocOpts, p.nocCat || 'none') +
-
-    '<h3>กฎใหม่ พ.ย. 2026: รายได้สูง (High-wage Tiers)</h3>' +
-    '<div class="sub" style="margin-top:-4px;margin-bottom:8px;color:var(--muted);font-size:12px;">* กฎใหม่คิดคะแนนจาก <b>ตัวเลือกที่ให้ผลลัพธ์สูงกว่าเท่านั้น</b> ระหว่างประสบการณ์ทำงาน หรือ ข้อเสนองาน (ไม่บวกรวมกัน)</div>' +
-    '<div class="row">' +
-    selectF(ix, 'highWageExp', 'โบนัสประสบการณ์ทำงานรายได้สูง', highWageExpOpts, p.highWageExp || 0) +
-    selectF(ix, 'highWageJob', 'โบนัสข้อเสนองานรายได้สูง (Job Offer)', highWageJobOpts, p.highWageJob || 0) +
-    '</div>' +
-
-    '<div class="row">' +
-    selectF(ix, 'lang1', 'ภาษาแรกที่สอบ', [['en', 'อังกฤษ (CLB)'], ['fr', 'ฝรั่งเศส (NCLC)']], p.lang1) +
-    selectF(ix, 'fw', 'ประสบการณ์ทำงานต่างประเทศ', FW_LABELS, p.fw) +
-    '</div>' +
-    
+  let h = '<section class="card"><div class="card-head"><h2>ข้อมูลโปรไฟล์ (Express Entry CRS)</h2></div>' +
+    '<div class="field"><label class="label">ชื่อโปรไฟล์</label><input type="text" data-f="name" value="' + esc(p.name) + '"></div>' +
+    '<h3>วันที่ประเมินอนาคต</h3>' +
+    '<div class="field"><label class="label">วันที่จำลองประเมินคะแนน</label><input type="date" data-f="targetEvalDate" value="' + esc(p.targetEvalDate) + '"></div>' +
+    '<h3>ข้อมูลส่วนบุคคล</h3>' +
+    '<div class="row"><div class="field"><label class="label">วันเกิด</label><input type="date" data-f="dob" value="' + esc(p.dob) + '"></div>' +
+    '<div class="field"><label class="label">อายุ (คำนวณอัตโนมัติ)</label><input type="number" data-f="age" value="' + esc(res.effectiveAge) + '"></div></div>' +
+    '<div class="row"><div class="field"><label class="label">วันเริ่มทำงานในแคนาดา</label><input type="date" data-f="caStartDate" value="' + esc(p.caStartDate) + '"></div>' +
+    selectF(ix, 'cwe', 'ประสบการณ์แคนาดา', CWE_LABELS.map((l, i) => [i, l]), res.effectiveCwe) + '</div>' +
+    selectF(ix, 'nocCat', 'กลุ่มอาชีพ NOC', nocOpts, p.nocCat || 'none') +
+    '<h3>กฎใหม่ พ.ย. 2026: High-wage Tiers</h3>' +
+    '<div class="row">' + selectF(ix, 'highWageExp', 'โบนัสประสบการณ์รายได้สูง', highWageExpOpts, p.highWageExp || 0) +
+    selectF(ix, 'highWageJob', 'โบนัส Job Offer รายได้สูง', highWageJobOpts, p.highWageJob || 0) + '</div>' +
+    '<div class="row">' + selectF(ix, 'lang1', 'ภาษาแรก', [['en', 'อังกฤษ'], ['fr', 'ฝรั่งเศส']], p.lang1) +
+    selectF(ix, 'fw', 'งานต่างประเทศ', FW_LABELS, p.fw) + '</div>' +
     selectF(ix, 'edu', 'การศึกษาสูงสุด', eduOpts, p.edu) +
-    clbRow(p.l1, 'l1', ix, 'ภาษาแรก ระดับต่อทักษะ (CLB 0–10)') +
-    clbRow(p.l2, 'l2', ix, 'ภาษาที่สอง ระดับต่อทักษะ (ใส่ 0 ถ้าไม่มี)') +
-    
-    '<div class="row">' + checkF(ix, 'cert', 'มี Certificate of Qualification (trades)', p.cert) + '</div>' +
-    '<h3>คะแนนเพิ่มอื่นๆ</h3>' +
-    '<div class="row">' + selectF(ix, 'study', 'เรียนต่อในแคนาดา', STUDY_LABELS.map((l, i) => [i, l]), p.study) + '</div>' +
-    '<div class="row">' + checkF(ix, 'sibling', 'มีพี่น้องเป็นพลเมือง/PR ในแคนาดา (+15)', p.sibling) +
-    checkF(ix, 'pnp', 'ได้รับ provincial nomination (+600)', p.pnp) + '</div>' +
-    '<h3>คู่สมรส</h3>' + checkF(ix, 'spouse', 'มีคู่สมรส/คู่ชีวิตที่ไปด้วย', p.spouse);
+    clbRow(p.l1, 'l1', ix, 'ภาษาแรก CLB') +
+    clbRow(p.l2, 'l2', ix, 'ภาษาที่สอง CLB') +
+    '<div class="row">' + checkF(ix, 'cert', 'Certificate of Qualification', p.cert) + '</div>' +
+    '<h3>คะแนนเพิ่ม</h3>' +
+    '<div class="row">' + selectF(ix, 'study', 'เรียนต่อแคนาดา', STUDY_LABELS.map((l, i) => [i, l]), p.study) + '</div>' +
+    '<div class="row">' + checkF(ix, 'sibling', 'พี่น้องในแคนาดา (+15)', p.sibling) + checkF(ix, 'pnp', 'Nomination (+600)', p.pnp) + '</div>' +
+    '<h3>คู่สมรส</h3>' + checkF(ix, 'spouse', 'มีคู่สมรส', p.spouse);
   if (p.spouse) {
-    h += '<div class="row">' + selectF(ix, 'spEdu', 'การศึกษาของคู่สมรส', eduOpts, p.spEdu) +
-      selectF(ix, 'spCwe', 'งานในแคนาดาของคู่สมรส', CWE_LABELS.map((l, i) => [i, l]), p.spCwe) + '</div>' +
-      clbRow(p.spL, 'spL', ix, 'ภาษาแรกของคู่สมรส (CLB 0–10)');
+    h += '<div class="row">' + selectF(ix, 'spEdu', 'การศึกษาคู่สมรส', eduOpts, p.spEdu) + selectF(ix, 'spCwe', 'งานแคนาดาคู่สมรส', CWE_LABELS.map((l, i) => [i, l]), p.spCwe) + '</div>' +
+      clbRow(p.spL, 'spL', ix, 'ภาษาคู่สมรส');
   }
   return h + '</section>';
 }
 
 function breakdownRows(c, p) {
   const r = (a, b) => '<tr><td>' + a + '</td><td>' + b + '</td></tr>';
-  let h = r('อายุ (ณ ' + c.evalDate + ')', c.age) + r('การศึกษา', c.edu) + r('ภาษาแรก', c.first) + r('ภาษาที่สอง', c.second) + r('งานในแคนาดา', c.cwe) +
-    r('<b>รวมส่วนหลัก</b>', '<b>' + c.core + '</b>');
+  let h = r('อายุ', c.age) + r('การศึกษา', c.edu) + r('ภาษาแรก', c.first) + r('ภาษาที่สอง', c.second) + r('งานแคนาดา', c.cwe) + r('<b>รวมส่วนหลัก</b>', '<b>' + c.core + '</b>');
   if (p.spouse) h += r('คู่สมรส', c.spouse);
-  h += r('Skill transferability', c.transfer);
-  h += r('ภาษาฝรั่งเศสเพิ่ม', c.french) + r('เรียนในแคนาดา', c.study) + r('พี่น้องในแคนาดา', c.sibling) + r('Provincial nomination', c.pnp);
-  if (c.selectedHighWageBonus > 0) {
-    h += r('โบนัสรายได้สูง (High-wage Nov 2026)', '+' + c.selectedHighWageBonus);
-  }
+  h += r('Skill transferability', c.transfer) + r('ภาษาฝรั่งเศส', c.french) + r('เรียนแคนาดา', c.study) + r('พี่น้อง', c.sibling) + r('PNP', c.pnp);
+  if (c.selectedHighWageBonus > 0) h += r('โบนัส High-wage พ.ย. 2026', '+' + c.selectedHighWageBonus);
   return h;
 }
 
@@ -681,45 +588,23 @@ function scoreBoxHtml() {
   const c = computeCRS(p);
   const cec = EE_REF[1].crs;
   const gap = c.total - cec;
-  const chip = p.pnp ? '' : gap >= 0
-    ? '<span class="pill ok">สูงกว่า CEC cutoff ล่าสุด ' + gap + '</span>'
-    : '<span class="pill warn">ต่ำกว่า CEC cutoff ล่าสุด ' + (-gap) + '</span>';
-  return '<div class="score-top"><div class="score-num" id="score-num">' + c.total + '</div><div class="label">คะแนน CRS ของ ' + esc(p.name) + ' (ประเมิน ณ ' + c.evalDate + ')</div></div>' +
-    '<div>' + chip + '</div>' +
-    '<table class="break"><tbody>' + breakdownRows(c, p) + '</tbody></table>';
-}
-
-function compareHtml() {
-  const [a, b] = state.profiles.map((p) => computeCRS(p));
-  const row = (l, x, y) => '<tr><td>' + l + '</td><td class="n">' + x + '</td><td class="n">' + y + '</td></tr>';
-  return '<details class="card"><summary>เทียบสองโปรไฟล์</summary><div class="scroll-x"><table class="ref"><thead><tr><th></th><th>' + esc(state.profiles[0].name) + '</th><th>' + esc(state.profiles[1].name) + '</th></tr></thead><tbody>' +
-    row('ส่วนหลัก', a.core, b.core) + row('คู่สมรส', a.spouse, b.spouse) + row('Skill transferability', a.transfer, b.transfer) +
-    row('คะแนนเพิ่ม', a.additional, b.additional) + row('<b>รวม</b>', '<b>' + a.total + '</b>', '<b>' + b.total + '</b>') +
-    '</tbody></table></div></details>';
+  const chip = p.pnp ? '' : gap >= 0 ? '<span class="pill ok">สูงกว่า CEC cutoff (' + gap + ')</span>' : '<span class="pill warn">ต่ำกว่า CEC cutoff (' + (-gap) + ')</span>';
+  return '<div class="score-top"><div class="score-num">' + c.total + '</div><div class="label">คะแนน CRS (' + c.evalDate + ')</div></div>' +
+    '<div>' + chip + '</div><table class="break"><tbody>' + breakdownRows(c, p) + '</tbody></table>';
 }
 
 function tabsHtml() {
-  return state.profiles.map((p, i) => {
-    const c = computeCRS(p).total;
-    return '<button class="tab" id="tab-' + i + '" data-act="tab" data-i="' + i + '" aria-pressed="' + (i === state.active) + '">' + esc(p.name) + '<span class="mono" id="tabscore-' + i + '">' + c + '</span></button>';
-  }).join('');
-}
-
-function noticesHtml() {
-  return '<div class="notice"><b>อัปเดตใหม่:</b> สามารถเปลี่ยน "วันที่ประเมินคะแนน" เพื่อจำลองดูคะแนน CRS และอายุงานในอนาคตได้ทันที!</div>';
+  return state.profiles.map((p, i) => '<button class="tab" data-act="tab" data-i="' + i + '" aria-pressed="' + (i === state.active) + '">' + esc(p.name) + '<span class="mono">' + computeCRS(p).total + '</span></button>').join('');
 }
 
 function render() {
-  const keep = document.activeElement && document.activeElement.id;
   document.getElementById('app').innerHTML =
-    '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะ Express Entry, OINP และ BC PNP พร้อมคำนวณคะแนน CRS (คำนวณอนาคตและเกณฑ์ใหม่)</p></div>' +
-    '<div class="tabs" id="tabs" role="group" aria-label="เลือกโปรไฟล์">' + tabsHtml() + '</div></header>' +
-    '<div id="notices" style="display:flex;flex-direction:column;gap:8px">' + noticesHtml() + '</div>' +
-    '<div class="grid"><div class="col" id="tracks">' + trackListHtml() + '</div>' +
-    '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + '<div id="compare">' + compareHtml() + '</div>' + refHtml() + '</div></div>' +
-    '<p class="foot"><span class="savestate" id="savestate">บันทึกอัตโนมัติในเบราว์เซอร์</span><br>' +
-    'ระยะเวลาเป็นการประมาณจากบทความข่าวและระยะเวลาทั่วไป ไม่ใช่ข้อมูลทางการของ IRCC หรือจังหวัด ตรวจระยะเวลาประมวลผลล่าสุดที่ canada.ca ก่อนวางแผน</p>';
-  if (keep) { const el = document.getElementById(keep); if (el) el.focus(); }
+    '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
+    '<div class="tabs">' + tabsHtml() + '</div></header>' +
+    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> แสดงขั้นตอนย่อยตั้งแต่เตรียมเอกสาร จนถึง P1, P2 และรับบัตร PR Card ครบถ้วน</div>' +
+    '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
+    '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
+    '<p class="foot"><span class="savestate" id="savestate">บันทึกอัตโนมัติแล้ว</span></p>';
 }
 
 function refreshLive() {
@@ -727,8 +612,6 @@ function refreshLive() {
   if (sb) sb.innerHTML = scoreBoxHtml();
   state.profiles.forEach((p, i) => { const el = document.getElementById('tabscore-' + i); if (el) el.textContent = computeCRS(p).total; });
   cur().tracks.forEach((t) => { const el = document.getElementById('pred-' + t.id); if (el) el.innerHTML = predHtml(t); });
-  const cmp = document.getElementById('compare');
-  if (cmp && !cmp.querySelector('details[open]')) cmp.innerHTML = compareHtml();
 }
 
 function setCrsField(el) {
@@ -736,12 +619,9 @@ function setCrsField(el) {
   const f = el.dataset.f;
   if (el.type === 'checkbox') p[f] = el.checked;
   else if (el.dataset.k !== undefined) p[f][Number(el.dataset.k)] = el.value === '' ? 0 : Number(el.value);
-  else if (el.type === 'number' || el.tagName === 'SELECT') {
-    if (f === 'lang1' || f === 'nocCat') p[f] = el.value;
-    else p[f] = el.value === '' ? 0 : Number(el.value);
-  } else p[f] = el.value;
+  else if (el.type === 'number' || el.tagName === 'SELECT') p[f] = (f === 'lang1' || f === 'nocCat') ? el.value : (el.value === '' ? 0 : Number(el.value));
+  else p[f] = el.value;
 
-  // ปรับการคำนวณอายุและอายุงานสดทันทีเมื่อเปลี่ยนวันที่
   if (f === 'dob' || f === 'targetEvalDate') {
     const evalDate = p.targetEvalDate || fmtISO(todayD());
     if (p.dob) {
@@ -753,62 +633,44 @@ function setCrsField(el) {
 
 function setTrackField(el) {
   const p = cur();
-  const t = p.tracks.find((x) => x.id === el.dataset.t);
+  const t = p.tracks.find(x => x.id === el.dataset.t);
   if (!t) return false;
   const f = el.dataset.tf;
   let rerender = false;
-  if (f === 'program') {
-    t.program = el.value; t.stage = 0; t.stream = DEFAULT_STREAM[t.program]; t.date = fmtISO(todayD());
-    t.history = [{ date: t.date, stage: 0 }]; rerender = true;
-  } else if (f === 'stage') {
-    t.stage = Number(el.value); t.date = fmtISO(todayD());
-    t.history.push({ date: t.date, stage: t.stage }); rerender = true;
-  } else if (f === 'date') {
-    if (el.value) { t.date = el.value; if (t.history.length) t.history[t.history.length - 1].date = t.date; }
-  } else if (f === 'stream') { t.stream = el.value; rerender = true; }
+  if (f === 'program') { t.program = el.value; t.stage = 0; t.stream = DEFAULT_STREAM[t.program]; t.date = fmtISO(todayD()); t.history = [{ date: t.date, stage: 0 }]; rerender = true; }
+  else if (f === 'stage') { t.stage = Number(el.value); t.date = fmtISO(todayD()); t.history.push({ date: t.date, stage: t.stage }); rerender = true; }
+  else if (f === 'date') { if (el.value) { t.date = el.value; if (t.history.length) t.history[t.history.length - 1].date = t.date; } }
+  else if (f === 'stream') { t.stream = el.value; rerender = true; }
   else t[f] = el.value;
   return rerender;
 }
 
-function onInput(e) {
+document.addEventListener('input', (e) => {
   const el = e.target;
-  if (el.dataset.f) {
-    setCrsField(el); scheduleSave();
-    const tab = document.getElementById('tab-' + state.active);
-    if (el.dataset.f === 'name' && tab) tab.firstChild.nodeValue = cur().name;
-    refreshLive();
-  } else if (el.dataset.t && (el.dataset.tf === 'sirs' || el.dataset.tf === 'note')) {
-    setTrackField(el); scheduleSave();
-    const t = cur().tracks.find((x) => x.id === el.dataset.t);
-    const pr = document.getElementById('pred-' + el.dataset.t);
-    if (t && pr) pr.innerHTML = predHtml(t);
+  if (el.dataset.f) { setCrsField(el); scheduleSave(); refreshLive(); }
+  else if (el.dataset.t && (el.dataset.tf === 'sirs' || el.dataset.tf === 'note')) { setTrackField(el); scheduleSave(); }
+});
+
+document.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset.f || el.dataset.t) {
+    if (el.dataset.f) setCrsField(el);
+    else setTrackField(el);
+    scheduleSave(); render();
   }
-}
+});
 
-function onChange(e) {
-  const el = e.target;
-  if (el.dataset.f) { setCrsField(el); scheduleSave(); render(); }
-  else if (el.dataset.t) { setTrackField(el); scheduleSave(); render(); }
-}
-
-function onClick(e) {
+document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const act = b.dataset.act;
-  if (act === 'tab') { state.active = Number(b.dataset.i); touched = true; writeLocal(); render(); }
+  if (act === 'tab') { state.active = Number(b.dataset.i); scheduleSave(); render(); }
   else if (act === 'add-track') { cur().tracks.push(newTrack('ee', 0, 0)); scheduleSave(); render(); }
-  else if (act === 'del-track') {
-    const p = cur();
-    p.tracks = p.tracks.filter((t) => t.id !== b.dataset.t);
-    scheduleSave(); render();
-  }
-}
+  else if (act === 'del-track') { cur().tracks = cur().tracks.filter(t => t.id !== b.dataset.t); scheduleSave(); render(); }
+});
 
 function start() {
   state = normalize(readLocal());
-  document.addEventListener('input', onInput);
-  document.addEventListener('change', onChange);
-  document.addEventListener('click', onClick);
   render();
 }
 start();
