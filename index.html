@@ -503,7 +503,7 @@ function trackHtml(t) {
   });
   t.history = uniqueHistory;
 
-  // สร้าง Timeline รายการที่สำเร็จแล้ว (พร้อมช่องแก้ Date และปุ่มลบ)
+  // สร้าง Timeline รายการที่สำเร็จแล้ว
   const timelineItems = uniqueHistory.map(h => {
     const stageObj = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
     const stageName = stageObj ? stageObj.label : 'ขั้นที่ ' + h.stage;
@@ -514,10 +514,24 @@ function trackHtml(t) {
       '</div></div>';
   }).join('');
 
-  // สร้าง Predict Timeline ของขั้นตอนที่เหลือถัดไป เรียงลงมาด้านล่าง
+  // สร้าง Predict Timeline ของขั้นตอนที่เหลือพร้อมคำนวณช่วงวันที่คาดว่าจะได้
   let remainingList = '';
+  let cursorDate = parseD(t.date || fmtISO(todayD()));
+  
   for (let i = idx + 1; i < prog.stages.length; i++) {
-    remainingList += '<div class="timeline-item" style="opacity: 0.8; border-left: 3px solid var(--muted);"><span>⏳ ' + (i + 1) + '. ' + esc(prog.stages[i].label) + '</span><span class="sub">รอดำเนินการ</span></div>';
+    const stObj = prog.stages[i];
+    const w = winOf(stObj, t) || [14, 30]; // กำหนดช่วงเวลาคาดเคลื่อนมาตรฐานถ้าไม่มีค่า win
+    const predFrom = addDays(cursorDate, w[0]);
+    const predTo = addDays(cursorDate, w[1]);
+    const dateStr = fmtSpan(predFrom, predTo);
+    
+    remainingList += '<div class="timeline-item" style="opacity: 0.85; border-left: 3px solid var(--accent);">' +
+      '<span>⏳ <b>' + (i + 1) + '. ' + esc(stObj.label) + '</b></span>' +
+      '<span class="mono" style="font-size:12px;background:var(--surface);padding:2px 6px;border-radius:4px;border:1px solid var(--line);">คาดว่า: ' + dateStr + '</span>' +
+      '</div>';
+    
+    // ขยับ cursor วันที่ไปข้างหน้าตามค่าเฉลี่ยของช่วงเวลานั้นๆ เพื่อใช้คำนวณสเต็ปถัดไป
+    cursorDate = predFrom;
   }
 
   return '<section class="card">' +
@@ -533,8 +547,8 @@ function trackHtml(t) {
     '<h3>ไทม์ไลน์ความคืบหน้าที่ทำสำเร็จแล้ว (แก้ไขวันที่/ลบได้)</h3>' +
     '<div class="timeline-box">' + (timelineItems || '<div class="sub">ยังไม่มีประวัติการทำสำเร็จ</div>') + '</div>' +
 
-    '<h3>Predict Timeline (ขั้นตอนที่เหลือในอนาคต)</h3>' +
-    '<div class="timeline-box" style="border-left-color: var(--muted);">' + (remainingList || '<div class="sub">ถึงขั้นตอนสุดท้ายแล้ว</div>') + '</div>' +
+    '<h3>Predict Timeline (ขั้นตอนที่เหลือ พร้อมวันที่คาดการณ์)</h3>' +
+    '<div class="timeline-box" style="border-left-color: var(--accent);">' + (remainingList || '<div class="sub">ถึงขั้นตอนสุดท้ายแล้ว</div>') + '</div>' +
     '</section>';
 }
 
@@ -632,7 +646,7 @@ function render() {
   document.getElementById('app').innerHTML =
     '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
     '<div class="tabs">' + tabsHtml() + '</div></header>' +
-    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> สามารถแก้ไขวันที่หรือลบประวัติขั้นตอนที่สำเร็จได้ และแสดง Predict Timeline ด้านล่างทันที</div>' +
+    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> แสดงวันที่คาดการณ์ใน Predict Timeline ล่วงหน้าให้ครบถ้วน</div>' +
     '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
     '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
     '<p class="foot"><span class="savestate" id="savestate">บันทึกอัตโนมัติแล้ว</span></p>';
