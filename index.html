@@ -53,11 +53,11 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 
 .btn {
   font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: 8px 14px; min-height: 40px;
-  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn.ghost { border-color: transparent; color: var(--muted); }
-.btn.small { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.btn.small { min-height: 36px; padding: 6px 12px; font-size: 13px; width: 100%; }
 
 .stage-stamp {
   display: inline-block; font-family: monospace; font-size: 12px; letter-spacing: .03em; text-transform: uppercase;
@@ -77,8 +77,8 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 .steps li.now { background: var(--accent); opacity: .5; }
 
 .timeline-box { margin-top: 4px; border-left: 2px solid var(--accent); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; }
-.timeline-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2); padding: 6px 10px; border-radius: 4px; gap: 8px; }
-.timeline-item input[type=date] { width: 130px; min-height: 30px; font-size: 12px; padding: 2px 6px; }
+.timeline-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2); padding: 8px 10px; border-radius: 4px; gap: 8px; flex-wrap: wrap; }
+.timeline-item input[type=date] { width: 130px; min-height: 32px; font-size: 12px; padding: 2px 6px; }
 
 .score-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .score-num { font-family: monospace; font-size: 52px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -490,10 +490,9 @@ function trackHtml(t) {
   const streamField = prog.streams ? '<div class="field"><label class="label">สตรีม</label><select data-t="' + t.id + '" data-tf="stream">' + Object.keys(prog.streams).map(k => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>' : '';
   const sirs = t.program === 'bc' ? '<div class="field"><label class="label">SIRS</label><input type="number" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>' : '';
   
-  // กรองประวัติไม่ให้ซ้ำซ้อน และเรียงตามลำดับสเต็ปจากน้อยไปมาก
+  // กรองประวัติไม่ให้ซ้ำซ้อน และเรียงตามลำดับสเต็ปจากน้อยไปมากเสมอ
   const uniqueHistory = [];
   const seenStages = new Set();
-  // จัดเรียงตาม stage index
   const sortedHist = [...(t.history || [])].sort((a, b) => a.stage - b.stage);
   
   sortedHist.forEach(h => {
@@ -502,23 +501,23 @@ function trackHtml(t) {
       uniqueHistory.push(h);
     }
   });
-  t.history = uniqueHistory; // อัปเดตเก็บกลับไป
+  t.history = uniqueHistory;
 
-  // สร้าง Timeline รายการที่สำเร็จแล้ว (พร้อมปุ่ม Edit วันที่ และปุ่มลบ)
+  // สร้าง Timeline รายการที่สำเร็จแล้ว (พร้อมช่องแก้ Date และปุ่มลบ)
   const timelineItems = uniqueHistory.map(h => {
     const stageObj = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
     const stageName = stageObj ? stageObj.label : 'ขั้นที่ ' + h.stage;
     return '<div class="timeline-item"><span>✅ <b>' + esc(stageName) + '</b></span>' +
       '<div style="display:flex;gap:6px;align-items:center;">' +
       '<input type="date" data-act="edit-history-date" data-t="' + t.id + '" data-stage="' + h.stage + '" value="' + esc(h.date) + '">' +
-      '<button class="btn ghost small" data-act="del-history" data-t="' + t.id + '" data-stage="' + h.stage + '" title="ลบรายการนี้">🗑️</button>' +
+      '<button class="btn ghost small" style="min-height:32px;width:32px;padding:0;" data-act="del-history" data-t="' + t.id + '" data-stage="' + h.stage + '" title="ลบรายการนี้">🗑️</button>' +
       '</div></div>';
   }).join('');
 
-  // สร้างรายการ Predict Timeline ของขั้นตอนที่เหลือถัดไป
+  // สร้าง Predict Timeline ของขั้นตอนที่เหลือถัดไป เรียงลงมาด้านล่าง
   let remainingList = '';
   for (let i = idx + 1; i < prog.stages.length; i++) {
-    remainingList += '<div class="timeline-item" style="opacity: 0.75; border-left: 3px solid var(--muted);"><span>⏳ ' + (i + 1) + '. ' + esc(prog.stages[i].label) + '</span><span class="sub">รอดำเนินการ</span></div>';
+    remainingList += '<div class="timeline-item" style="opacity: 0.8; border-left: 3px solid var(--muted);"><span>⏳ ' + (i + 1) + '. ' + esc(prog.stages[i].label) + '</span><span class="sub">รอดำเนินการ</span></div>';
   }
 
   return '<section class="card">' +
@@ -633,7 +632,7 @@ function render() {
   document.getElementById('app').innerHTML =
     '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
     '<div class="tabs">' + tabsHtml() + '</div></header>' +
-    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> สามารถแก้ไขวันที่หรือลบประวัติขั้นตอนที่สำเร็จได้ และแสดง Predict Timeline ของขั้นตอนที่เหลือด้านล่างทันที</div>' +
+    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> สามารถแก้ไขวันที่หรือลบประวัติขั้นตอนที่สำเร็จได้ และแสดง Predict Timeline ด้านล่างทันที</div>' +
     '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
     '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
     '<p class="foot"><span class="savestate" id="savestate">บันทึกอัตโนมัติแล้ว</span></p>';
