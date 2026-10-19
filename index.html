@@ -139,7 +139,7 @@ const HIGH_WAGE_JOB_OPTIONS = [
 
 const EE_STAGES = [
   { label: 'เตรียมเอกสารตั้งต้น', win: [14, 30] },
-  { label: 'สร้างโปรไฟล์ EE (อยู่ใน Pool)', win: null, mode: 'ee-pool' },
+  { label: 'สร้างโปรไฟล์ EE (อยู่ใน Pool)', win: [14, 30], mode: 'ee-pool' },
   { label: 'ได้รับ ITA แล้ว', win: [14, 60], deadline: 60, hint: 'ต้องยื่น PR ภายใน 60 วันหลังได้ ITA' },
   { label: 'ตรวจสุขภาพ (Upfront Medical)', win: [7, 30] },
   { label: 'ขอใบรับรองความประพฤติ (PCC)', win: [14, 45] },
@@ -158,19 +158,19 @@ const EE_STAGES = [
 const PROGRAMS = {
   ee: { name: 'Express Entry (Granular Track)', stages: EE_STAGES },
   bc: { name: 'BC PNP', stages: [
-    { label: 'ลงทะเบียน SIRS รอ invitation', win: null, mode: 'bc-pool' },
+    { label: 'ลงทะเบียน SIRS รอ invitation', win: [14, 30], mode: 'bc-pool' },
     { label: 'ได้รับ invitation แล้ว', win: [7, 25], deadline: 25 },
     { label: 'ยื่นใบสมัคร BC PNP', win: [60, 90] },
     { label: 'ได้ nomination', win: [14, 60] },
     { label: 'ยื่น PR ที่ IRCC', win: [150, 210] },
-    { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true }
+    { label: 'ได้ COPR / เป็น PR แล้ว', win: [30, 90], final: true }
   ]},
   oinp: { name: 'OINP (Ontario)', stages: [
-    { label: 'เตรียมเอกสาร', win: null, mode: 'oinp-prep' },
+    { label: 'เตรียมเอกสาร', win: [14, 30], mode: 'oinp-prep' },
     { label: 'ยื่นใบสมัคร OINP', win: [30, 90] },
     { label: 'ได้ nomination', win: [14, 60], deadline: 180 },
     { label: 'ยื่น PR ที่ IRCC', win: [180, 240] },
-    { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true }
+    { label: 'ได้ COPR / เป็น PR แล้ว', win: [30, 90], final: true }
   ]}
 };
 const DEFAULT_STREAM = { ee: '', bc: 'si', oinp: 'hc' };
@@ -185,7 +185,7 @@ const EE_CLUSTER_ANCHOR = '2026-09-28';
 const EE_CLUSTER_GAP = 14;
 
 const DAY = 86400000;
-function parseD(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
+function parseD(s) { if(!s) return todayD(); const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
 function fmtISO(d) { const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function todayD() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
 function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
@@ -514,24 +514,27 @@ function trackHtml(t) {
       '</div></div>';
   }).join('');
 
-  // สร้าง Predict Timeline ของขั้นตอนที่เหลือพร้อมคำนวณช่วงวันที่คาดว่าจะได้
+  // คำนวณวันที่สะสมล่วงหน้าสำหรับ Predict Timeline ของขั้นตอนที่เหลือ
   let remainingList = '';
-  let cursorDate = parseD(t.date || fmtISO(todayD()));
-  
+  let accumMin = 0;
+  let accumMax = 0;
+  const baseDate = parseD(t.date || fmtISO(todayD()));
+
   for (let i = idx + 1; i < prog.stages.length; i++) {
     const stObj = prog.stages[i];
-    const w = winOf(stObj, t) || [14, 30]; // กำหนดช่วงเวลาคาดเคลื่อนมาตรฐานถ้าไม่มีค่า win
-    const predFrom = addDays(cursorDate, w[0]);
-    const predTo = addDays(cursorDate, w[1]);
+    const w = winOf(stObj, t) || [14, 30]; // ดึงระยะเวลาขั้นต่ำและสูงสุดของสเต็ปนั้นๆ
+    
+    accumMin += w[0];
+    accumMax += w[1];
+    
+    const predFrom = addDays(baseDate, accumMin);
+    const predTo = addDays(baseDate, accumMax);
     const dateStr = fmtSpan(predFrom, predTo);
     
-    remainingList += '<div class="timeline-item" style="opacity: 0.85; border-left: 3px solid var(--accent);">' +
+    remainingList += '<div class="timeline-item" style="opacity: 0.9; border-left: 3px solid var(--accent);">' +
       '<span>⏳ <b>' + (i + 1) + '. ' + esc(stObj.label) + '</b></span>' +
-      '<span class="mono" style="font-size:12px;background:var(--surface);padding:2px 6px;border-radius:4px;border:1px solid var(--line);">คาดว่า: ' + dateStr + '</span>' +
+      '<span class="mono" style="font-size:12px;background:var(--surface);padding:3px 8px;border-radius:4px;border:1px solid var(--line);color:var(--accent);font-weight:600;">คาดว่า: ' + dateStr + '</span>' +
       '</div>';
-    
-    // ขยับ cursor วันที่ไปข้างหน้าตามค่าเฉลี่ยของช่วงเวลานั้นๆ เพื่อใช้คำนวณสเต็ปถัดไป
-    cursorDate = predFrom;
   }
 
   return '<section class="card">' +
@@ -646,7 +649,7 @@ function render() {
   document.getElementById('app').innerHTML =
     '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
     '<div class="tabs">' + tabsHtml() + '</div></header>' +
-    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> แสดงวันที่คาดการณ์ใน Predict Timeline ล่วงหน้าให้ครบถ้วน</div>' +
+    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> แสดงวันที่คาดการณ์ใน Predict Timeline ล่วงหน้าเรียบร้อยแล้ว</div>' +
     '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
     '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
     '<p class="foot"><span class="savestate" id="savestate">บันทึกอัตโนมัติแล้ว</span></p>';
