@@ -76,8 +76,9 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 .steps li.done { background: var(--accent); }
 .steps li.now { background: var(--accent); opacity: .5; }
 
-.timeline-box { margin-top: 8px; border-left: 2px solid var(--accent); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; }
-.timeline-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2); padding: 6px 10px; border-radius: 4px; }
+.timeline-box { margin-top: 4px; border-left: 2px solid var(--accent); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; }
+.timeline-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2); padding: 6px 10px; border-radius: 4px; gap: 8px; }
+.timeline-item input[type=date] { width: 130px; min-height: 30px; font-size: 12px; padding: 2px 6px; }
 
 .score-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .score-num { font-family: monospace; font-size: 52px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -489,24 +490,52 @@ function trackHtml(t) {
   const streamField = prog.streams ? '<div class="field"><label class="label">สตรีม</label><select data-t="' + t.id + '" data-tf="stream">' + Object.keys(prog.streams).map(k => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>' : '';
   const sirs = t.program === 'bc' ? '<div class="field"><label class="label">SIRS</label><input type="number" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>' : '';
   
-  // สร้าง Timeline รายการที่ผ่านไปแล้วแสดงด้านล่าง
-  const timelineItems = (t.history || []).map(h => {
-    const stageName = prog.stages[Math.min(h.stage, prog.stages.length - 1)].label;
-    return '<div class="timeline-item"><span>✅ ' + esc(stageName) + '</span><span class="mono">' + esc(h.date) + '</span></div>';
+  // กรองประวัติไม่ให้ซ้ำซ้อน และเรียงตามลำดับสเต็ปจากน้อยไปมาก
+  const uniqueHistory = [];
+  const seenStages = new Set();
+  // จัดเรียงตาม stage index
+  const sortedHist = [...(t.history || [])].sort((a, b) => a.stage - b.stage);
+  
+  sortedHist.forEach(h => {
+    if (!seenStages.has(h.stage)) {
+      seenStages.add(h.stage);
+      uniqueHistory.push(h);
+    }
+  });
+  t.history = uniqueHistory; // อัปเดตเก็บกลับไป
+
+  // สร้าง Timeline รายการที่สำเร็จแล้ว (พร้อมปุ่ม Edit วันที่ และปุ่มลบ)
+  const timelineItems = uniqueHistory.map(h => {
+    const stageObj = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
+    const stageName = stageObj ? stageObj.label : 'ขั้นที่ ' + h.stage;
+    return '<div class="timeline-item"><span>✅ <b>' + esc(stageName) + '</b></span>' +
+      '<div style="display:flex;gap:6px;align-items:center;">' +
+      '<input type="date" data-act="edit-history-date" data-t="' + t.id + '" data-stage="' + h.stage + '" value="' + esc(h.date) + '">' +
+      '<button class="btn ghost small" data-act="del-history" data-t="' + t.id + '" data-stage="' + h.stage + '" title="ลบรายการนี้">🗑️</button>' +
+      '</div></div>';
   }).join('');
 
+  // สร้างรายการ Predict Timeline ของขั้นตอนที่เหลือถัดไป
+  let remainingList = '';
+  for (let i = idx + 1; i < prog.stages.length; i++) {
+    remainingList += '<div class="timeline-item" style="opacity: 0.75; border-left: 3px solid var(--muted);"><span>⏳ ' + (i + 1) + '. ' + esc(prog.stages[i].label) + '</span><span class="sub">รอดำเนินการ</span></div>';
+  }
+
   return '<section class="card">' +
-    '<div class="card-head"><div><span class="stage-stamp">' + esc(prog.name) + '</span></div><button class="btn ghost small" data-act="del-track" data-t="' + t.id + '">ลบ</button></div>' +
+    '<div class="card-head"><div><span class="stage-stamp">' + esc(prog.name) + '</span></div><button class="btn ghost small" data-act="del-track" data-t="' + t.id + '">ลบโปรแกรมนี้</button></div>' +
     '<div class="row"><div class="field"><label class="label">โปรแกรม</label><select data-t="' + t.id + '" data-tf="program">' + Object.keys(PROGRAMS).map(k => opt(k, PROGRAMS[k].name, t.program)).join('') + '</select></div>' + streamField + '</div>' +
     '<div class="row"><div class="field"><label class="label">ขั้นตอนปัจจุบัน (' + (idx + 1) + '/' + prog.stages.length + ')</label><select data-t="' + t.id + '" data-tf="stage">' + prog.stages.map((s, i) => opt(i, (i + 1) + '. ' + s.label, idx)).join('') + '</select></div>' +
     '<div class="field"><label class="label">วันที่อัปเดตสถานะนี้</label><input type="date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' + sirs + '</div>' +
     '<ol class="steps">' + dots + '</ol>' +
     '<div class="pred" id="pred-' + t.id + '">' + predHtml(t) + '</div>' +
-    // ปุ่มกดอัปเดตสำเร็จขั้นตอนปัจจุบัน ล็อควันที่วันนี้ทันที
-    '<button class="btn primary small" data-act="complete-stage" data-t="' + t.id + '">✅ ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและล็อควันที่)</button>' +
+    '<button class="btn primary small" data-act="complete-stage" data-t="' + t.id + '">✅ ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและบันทึก)</button>' +
     '<div class="field"><label class="label">บันทึกเพิ่มเติม</label><textarea data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
-    '<h3>ไทม์ไลน์ความคืบหน้าที่ทำสำเร็จแล้ว</h3>' +
+    
+    '<h3>ไทม์ไลน์ความคืบหน้าที่ทำสำเร็จแล้ว (แก้ไขวันที่/ลบได้)</h3>' +
     '<div class="timeline-box">' + (timelineItems || '<div class="sub">ยังไม่มีประวัติการทำสำเร็จ</div>') + '</div>' +
+
+    '<h3>Predict Timeline (ขั้นตอนที่เหลือในอนาคต)</h3>' +
+    '<div class="timeline-box" style="border-left-color: var(--muted);">' + (remainingList || '<div class="sub">ถึงขั้นตอนสุดท้ายแล้ว</div>') + '</div>' +
     '</section>';
 }
 
@@ -604,7 +633,7 @@ function render() {
   document.getElementById('app').innerHTML =
     '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
     '<div class="tabs">' + tabsHtml() + '</div></header>' +
-    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> กดปุ่มยืนยันเพื่อล็อควันที่ทำสำเร็จ และแสดง Timeline ด้านล่างทันที</div>' +
+    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> สามารถแก้ไขวันที่หรือลบประวัติขั้นตอนที่สำเร็จได้ และแสดง Predict Timeline ของขั้นตอนที่เหลือด้านล่างทันที</div>' +
     '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
     '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
     '<p class="foot"><span class="savestate" id="savestate">บันทึกอัตโนมัติแล้ว</span></p>';
@@ -658,8 +687,19 @@ document.addEventListener('change', (e) => {
   const el = e.target;
   if (el.dataset.f || el.dataset.t) {
     if (el.dataset.f) setCrsField(el);
-    else setTrackField(el);
+    else if (el.dataset.tf) setTrackField(el);
     scheduleSave(); render();
+  } else if (el.dataset.act === 'edit-history-date') {
+    const t = cur().tracks.find(x => x.id === el.dataset.t);
+    const stageNum = Number(el.dataset.stage);
+    if (t && t.history) {
+      const h = t.history.find(x => x.stage === stageNum);
+      if (h) {
+        h.date = el.value;
+        scheduleSave();
+        render();
+      }
+    }
   }
 });
 
@@ -670,6 +710,15 @@ document.addEventListener('click', (e) => {
   if (act === 'tab') { state.active = Number(b.dataset.i); scheduleSave(); render(); }
   else if (act === 'add-track') { cur().tracks.push(newTrack('ee', 0, 0)); scheduleSave(); render(); }
   else if (act === 'del-track') { cur().tracks = cur().tracks.filter(t => t.id !== b.dataset.t); scheduleSave(); render(); }
+  else if (act === 'del-history') {
+    const t = cur().tracks.find(x => x.id === b.dataset.t);
+    const stageNum = Number(b.dataset.stage);
+    if (t && t.history) {
+      t.history = t.history.filter(x => x.stage !== stageNum);
+      scheduleSave();
+      render();
+    }
+  }
   else if (act === 'complete-stage') {
     const p = cur();
     const t = p.tracks.find(x => x.id === b.dataset.t);
@@ -678,7 +727,6 @@ document.addEventListener('click', (e) => {
       const currentStageIdx = t.stage;
       const currentDate = t.date || fmtISO(todayD());
       
-      // บันทึกลง history ถ้ายังไม่มี
       if (!t.history) t.history = [];
       const existing = t.history.find(h => h.stage === currentStageIdx);
       if (!existing) {
@@ -687,7 +735,6 @@ document.addEventListener('click', (e) => {
         existing.date = currentDate;
       }
 
-      // เลื่อนไปยังสเต็ปถัดไปถ้ายังไม่ถึงขั้นสุดท้าย
       if (currentStageIdx < prog.stages.length - 1) {
         t.stage = currentStageIdx + 1;
         t.date = fmtISO(todayD());
