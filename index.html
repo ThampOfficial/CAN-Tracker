@@ -76,6 +76,9 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 .steps li.done { background: var(--accent); }
 .steps li.now { background: var(--accent); opacity: .5; }
 
+.timeline-box { margin-top: 8px; border-left: 2px solid var(--accent); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; }
+.timeline-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2); padding: 6px 10px; border-radius: 4px; }
+
 .score-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .score-num { font-family: monospace; font-size: 52px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
 table.break { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -89,12 +92,8 @@ table.ref th { color: var(--muted); font-weight: 500; font-size: 12px; }
 table.ref td.n { font-family: monospace; font-variant-numeric: tabular-nums; text-align: right; }
 
 details > summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
-.hist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
-.hist .mono { color: var(--ink); }
-.empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
 .foot { color: var(--muted); font-size: 12px; }
 .savestate { font-size: 12px; color: var(--muted); }
-.auto-tag { font-size: 11px; background: var(--ok-bg); color: var(--ok); padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-left: 6px; }
 </style>
 <div id="app" class="wrap"><p class="sub">กำลังโหลด…</p></div>
 <script>
@@ -183,11 +182,6 @@ const EE_REF = [
 ];
 const EE_CLUSTER_ANCHOR = '2026-09-28';
 const EE_CLUSTER_GAP = 14;
-const BC_REF = [
-  { cat: 'Skilled Worker', date: '2026-06-04', score: 95 },
-  { cat: 'Tech Pilot', date: '2026-06-04', score: 85 },
-  { cat: 'International Graduate', date: '2026-05-21', score: 88 },
-];
 
 const DAY = 86400000;
 function parseD(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
@@ -451,9 +445,8 @@ function deadlinePill(p) {
 
 function eePoolHtml(p, t) {
   const s = p.score;
-  const prof = cur();
-  const cec = EE_REF[1].crs, pnp = EE_REF[0].crs;
-  let verdict = s >= cec ? '<span class="pill ok">คะแนนสูงกว่า cutoff CEC ล่าสุด (' + cec + ') มีโอกาสสูงในรอบถัดไป</span>' : '<span class="pill bad">คะแนนต่ำกว่า CEC cutoff ล่าสุด (' + cec + ')</span>';
+  const cec = EE_REF[1].crs;
+  let verdict = s >= cec ? '<span class="pill ok">คะแนนสูงกว่า cutoff CEC ล่าสุด (' + cec + ') มีโอกาสสูง</span>' : '<span class="pill bad">คะแนนต่ำกว่า CEC cutoff ล่าสุด (' + cec + ')</span>';
   return '<div class="big">รอบ draw ถัดไปคาดว่า ~' + fmtTH(p.nextDraw) + '</div>' +
     '<div>' + verdict + '</div>' +
     '<div class="sub">หลังได้ ITA ปกติใช้เวลาอีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
@@ -495,16 +488,26 @@ function trackHtml(t) {
   const dots = prog.stages.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '" title="' + esc(s.label) + '"></li>').join('');
   const streamField = prog.streams ? '<div class="field"><label class="label">สตรีม</label><select data-t="' + t.id + '" data-tf="stream">' + Object.keys(prog.streams).map(k => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>' : '';
   const sirs = t.program === 'bc' ? '<div class="field"><label class="label">SIRS</label><input type="number" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>' : '';
-  const hist = (t.history || []).slice().reverse().map(h => '<li><span class="mono">' + esc(h.date) + '</span> ' + esc(prog.stages[Math.min(h.stage, prog.stages.length - 1)].label) + '</li>').join('');
+  
+  // สร้าง Timeline รายการที่ผ่านไปแล้วแสดงด้านล่าง
+  const timelineItems = (t.history || []).map(h => {
+    const stageName = prog.stages[Math.min(h.stage, prog.stages.length - 1)].label;
+    return '<div class="timeline-item"><span>✅ ' + esc(stageName) + '</span><span class="mono">' + esc(h.date) + '</span></div>';
+  }).join('');
+
   return '<section class="card">' +
     '<div class="card-head"><div><span class="stage-stamp">' + esc(prog.name) + '</span></div><button class="btn ghost small" data-act="del-track" data-t="' + t.id + '">ลบ</button></div>' +
     '<div class="row"><div class="field"><label class="label">โปรแกรม</label><select data-t="' + t.id + '" data-tf="program">' + Object.keys(PROGRAMS).map(k => opt(k, PROGRAMS[k].name, t.program)).join('') + '</select></div>' + streamField + '</div>' +
     '<div class="row"><div class="field"><label class="label">ขั้นตอนปัจจุบัน (' + (idx + 1) + '/' + prog.stages.length + ')</label><select data-t="' + t.id + '" data-tf="stage">' + prog.stages.map((s, i) => opt(i, (i + 1) + '. ' + s.label, idx)).join('') + '</select></div>' +
-    '<div class="field"><label class="label">วันที่อัปเดต</label><input type="date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' + sirs + '</div>' +
+    '<div class="field"><label class="label">วันที่อัปเดตสถานะนี้</label><input type="date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' + sirs + '</div>' +
     '<ol class="steps">' + dots + '</ol>' +
     '<div class="pred" id="pred-' + t.id + '">' + predHtml(t) + '</div>' +
-    '<div class="field"><label class="label">บันทึก</label><textarea data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
-    '<details><summary>ประวัติการอัปเดต</summary><ul class="hist">' + (hist || '<li>ไม่มี</li>') + '</ul></details></section>';
+    // ปุ่มกดอัปเดตสำเร็จขั้นตอนปัจจุบัน ล็อควันที่วันนี้ทันที
+    '<button class="btn primary small" data-act="complete-stage" data-t="' + t.id + '">✅ ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและล็อควันที่)</button>' +
+    '<div class="field"><label class="label">บันทึกเพิ่มเติม</label><textarea data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
+    '<h3>ไทม์ไลน์ความคืบหน้าที่ทำสำเร็จแล้ว</h3>' +
+    '<div class="timeline-box">' + (timelineItems || '<div class="sub">ยังไม่มีประวัติการทำสำเร็จ</div>') + '</div>' +
+    '</section>';
 }
 
 function trackListHtml() {
@@ -601,7 +604,7 @@ function render() {
   document.getElementById('app').innerHTML =
     '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
     '<div class="tabs">' + tabsHtml() + '</div></header>' +
-    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> แสดงขั้นตอนย่อยตั้งแต่เตรียมเอกสาร จนถึง P1, P2 และรับบัตร PR Card ครบถ้วน</div>' +
+    '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> กดปุ่มยืนยันเพื่อล็อควันที่ทำสำเร็จ และแสดง Timeline ด้านล่างทันที</div>' +
     '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
     '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
     '<p class="foot"><span class="savestate" id="savestate">บันทึกอัตโนมัติแล้ว</span></p>';
@@ -667,6 +670,32 @@ document.addEventListener('click', (e) => {
   if (act === 'tab') { state.active = Number(b.dataset.i); scheduleSave(); render(); }
   else if (act === 'add-track') { cur().tracks.push(newTrack('ee', 0, 0)); scheduleSave(); render(); }
   else if (act === 'del-track') { cur().tracks = cur().tracks.filter(t => t.id !== b.dataset.t); scheduleSave(); render(); }
+  else if (act === 'complete-stage') {
+    const p = cur();
+    const t = p.tracks.find(x => x.id === b.dataset.t);
+    if (t) {
+      const prog = PROGRAMS[t.program];
+      const currentStageIdx = t.stage;
+      const currentDate = t.date || fmtISO(todayD());
+      
+      // บันทึกลง history ถ้ายังไม่มี
+      if (!t.history) t.history = [];
+      const existing = t.history.find(h => h.stage === currentStageIdx);
+      if (!existing) {
+        t.history.push({ date: currentDate, stage: currentStageIdx });
+      } else {
+        existing.date = currentDate;
+      }
+
+      // เลื่อนไปยังสเต็ปถัดไปถ้ายังไม่ถึงขั้นสุดท้าย
+      if (currentStageIdx < prog.stages.length - 1) {
+        t.stage = currentStageIdx + 1;
+        t.date = fmtISO(todayD());
+      }
+      scheduleSave();
+      render();
+    }
+  }
 });
 
 function start() {
