@@ -146,25 +146,25 @@ const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const minOf = (arr) => Math.min(...arr.map((v) => clamp(Math.round(num(v)), 0, 10)));
 const lvl = (v) => clamp(Math.round(num(v)), 0, 10);
 
-function calcAgeFromDob(dobStr) {
+function calcAgeOnDate(dobStr, targetDateStr) {
   if (!dobStr) return null;
   const dob = new Date(dobStr);
-  if (isNaN(dob.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  const m = today.getMonth() - dob.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+  const target = targetDateStr ? new Date(targetDateStr) : new Date();
+  if (isNaN(dob.getTime()) || isNaN(target.getTime())) return null;
+  let age = target.getFullYear() - dob.getFullYear();
+  const m = target.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && target.getDate() < dob.getDate())) {
     age--;
   }
   return age;
 }
 
-function calcCweFromStart(startDateStr) {
+function calcCweOnDate(startDateStr, targetDateStr) {
   if (!startDateStr) return null;
   const start = new Date(startDateStr);
-  if (isNaN(start.getTime())) return null;
-  const today = new Date();
-  const diffTime = today - start;
+  const target = targetDateStr ? new Date(targetDateStr) : new Date();
+  if (isNaN(start.getTime()) || isNaN(target.getTime())) return null;
+  const diffTime = target - start;
   if (diffTime < 0) return 0;
   const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
   if (diffYears < 1) return 0;
@@ -204,16 +204,17 @@ function eduTier(i) { return i >= 5 ? 2 : i >= 2 ? 1 : 0; }
 
 function computeCRS(p) {
   const sp = !!p.spouse;
+  const evalDate = p.targetEvalDate || fmtISO(todayD());
   
   let effectiveAge = p.age;
   if (p.dob) {
-    const calcA = calcAgeFromDob(p.dob);
+    const calcA = calcAgeOnDate(p.dob, evalDate);
     if (calcA !== null) effectiveAge = calcA;
   }
   
   let effectiveCwe = p.cwe;
   if (p.caStartDate) {
-    const calcC = calcCweFromStart(p.caStartDate);
+    const calcC = calcCweOnDate(p.caStartDate, evalDate);
     if (calcC !== null) effectiveCwe = calcC;
   }
 
@@ -258,7 +259,6 @@ function computeCRS(p) {
   const sibling = p.sibling ? 15 : 0;
   const pnp = p.pnp ? 600 : 0;
   
-  // กฎใหม่ Nov 3, 2026: เลือกตัวที่สูงกว่าระหว่าง High-wage Experience หรือ High-wage Job Offer (ไม่นำมารวมกัน)
   const highWageExpPts = num(p.highWageExp || 0);
   const highWageJobPts = num(p.highWageJob || 0);
   const selectedHighWageBonus = Math.max(highWageExpPts, highWageJobPts);
@@ -268,7 +268,7 @@ function computeCRS(p) {
   return {
     age, edu, first, second, cwe, core, spouse, transfer, transferParts,
     french, study, sibling, pnp, selectedHighWageBonus, additional,
-    effectiveAge, effectiveCwe,
+    effectiveAge, effectiveCwe, evalDate,
     total: core + spouse + transfer + additional,
   };
 }
@@ -403,7 +403,7 @@ function newTrack(program, daysAgo, stage) {
 }
 function newProfile(name, over) {
   return Object.assign({
-    name, spouse: false, dob: '', age: 30, caStartDate: '', edu: 4, nocCat: 'none', 
+    name, spouse: false, dob: '', targetEvalDate: fmtISO(todayD()), age: 30, caStartDate: '', edu: 4, nocCat: 'none', 
     highWageExp: 0, highWageJob: 0, lang1: 'en', l1: [9, 9, 9, 9], l2: [0, 0, 0, 0],
     cwe: 1, fw: 0, cert: false, study: 0, sibling: false, pnp: false,
     spEdu: 0, spL: [0, 0, 0, 0], spCwe: 0, tracks: [],
@@ -419,6 +419,7 @@ function normalize(s) {
   if (!s || !Array.isArray(s.profiles) || s.profiles.length < 2) return base;
   s.profiles = s.profiles.slice(0, 2).map((p, i) => {
     const q = Object.assign(newProfile('โปรไฟล์ ' + (i + 1)), p);
+    if (!q.targetEvalDate) q.targetEvalDate = fmtISO(todayD());
     ['l1', 'l2', 'spL'].forEach((k) => { if (!Array.isArray(q[k]) || q[k].length !== 4) q[k] = [0, 0, 0, 0]; });
     q.tracks = (Array.isArray(p.tracks) ? p.tracks : []).filter((t) => t && PROGRAMS[t.program]).map((t) => {
       const base2 = newTrack(t.program);
@@ -609,17 +610,20 @@ function crsFormHtml() {
   const highWageExpOpts = HIGH_WAGE_EXP_OPTIONS.map(o => [o.val, o.label]);
   const highWageJobOpts = HIGH_WAGE_JOB_OPTIONS.map(o => [o.val, o.label]);
   
-  let ageAutoTag = p.dob ? '<span class="auto-tag">คำนวณอัตโนมัติ: ' + res.effectiveAge + ' ปี</span>' : '';
-  let cweAutoTag = p.caStartDate ? '<span class="auto-tag">คำนวณอัตโนมัติ: ' + res.effectiveCwe + ' ปี</span>' : '';
+  let ageAutoTag = p.dob ? '<span class="auto-tag">ณ วันที่ประเมิน: ' + res.effectiveAge + ' ปี</span>' : '';
+  let cweAutoTag = p.caStartDate ? '<span class="auto-tag">ณ วันที่ประเมิน: ' + res.effectiveCwe + ' ปี</span>' : '';
 
   let h = '<section class="card" aria-label="ข้อมูลโปรไฟล์">' +
     '<div class="card-head"><h2>ข้อมูลโปรไฟล์ (Express Entry CRS)</h2></div>' +
     '<div class="field"><label class="label" for="p' + ix + '-name">ชื่อโปรไฟล์</label><input type="text" id="p' + ix + '-name" data-f="name" maxlength="40" value="' + esc(p.name) + '"></div>' +
     
+    '<h3>ตั้งค่าการคำนวณและประเมินอนาคต</h3>' +
+    '<div class="field"><label class="label" for="p' + ix + '-targetEvalDate">วันที่ประเมินคะแนน (ใส่วันในอนาคตเพื่อจำลองคะแนน ณ วันนั้น)</label><input type="date" id="p' + ix + '-targetEvalDate" data-f="targetEvalDate" value="' + esc(p.targetEvalDate) + '"></div>' +
+
     '<h3>ข้อมูลส่วนบุคคลและการทำงาน</h3>' +
     '<div class="row">' +
-    '<div class="field"><label class="label" for="p' + ix + '-dob">วันเกิด (คำนวณอายุอัตโนมัติ)</label><input type="date" id="p' + ix + '-dob" data-f="dob" value="' + esc(p.dob) + '"></div>' +
-    '<div class="field"><label class="label" for="p' + ix + '-age">อายุ (ระบุเองถ้าไม่ใส่วันเกิด)' + ageAutoTag + '</label><input type="number" inputmode="numeric" min="17" max="60" id="p' + ix + '-age" data-f="age" value="' + esc(p.age) + '"' + (p.dob ? ' disabled' : '') + '></div>' +
+    '<div class="field"><label class="label" for="p' + ix + '-dob">วันเกิด (คำนวณอายุอัตโนมัติตามวันที่ประเมิน)</label><input type="date" id="p' + ix + '-dob" data-f="dob" value="' + esc(p.dob) + '"></div>' +
+    '<div class="field"><label class="label" for="p' + ix + '-age">อายุ ' + ageAutoTag + '</label><input type="number" inputmode="numeric" min="17" max="60" id="p' + ix + '-age" data-f="age" value="' + esc(res.effectiveAge) + '"></div>' +
     '</div>' +
     
     '<div class="row">' +
@@ -661,7 +665,7 @@ function crsFormHtml() {
 
 function breakdownRows(c, p) {
   const r = (a, b) => '<tr><td>' + a + '</td><td>' + b + '</td></tr>';
-  let h = r('อายุ', c.age) + r('การศึกษา', c.edu) + r('ภาษาแรก', c.first) + r('ภาษาที่สอง', c.second) + r('งานในแคนาดา', c.cwe) +
+  let h = r('อายุ (ณ ' + c.evalDate + ')', c.age) + r('การศึกษา', c.edu) + r('ภาษาแรก', c.first) + r('ภาษาที่สอง', c.second) + r('งานในแคนาดา', c.cwe) +
     r('<b>รวมส่วนหลัก</b>', '<b>' + c.core + '</b>');
   if (p.spouse) h += r('คู่สมรส', c.spouse);
   h += r('Skill transferability', c.transfer);
@@ -680,7 +684,7 @@ function scoreBoxHtml() {
   const chip = p.pnp ? '' : gap >= 0
     ? '<span class="pill ok">สูงกว่า CEC cutoff ล่าสุด ' + gap + '</span>'
     : '<span class="pill warn">ต่ำกว่า CEC cutoff ล่าสุด ' + (-gap) + '</span>';
-  return '<div class="score-top"><div class="score-num" id="score-num">' + c.total + '</div><div class="label">คะแนน CRS ของ ' + esc(p.name) + '</div></div>' +
+  return '<div class="score-top"><div class="score-num" id="score-num">' + c.total + '</div><div class="label">คะแนน CRS ของ ' + esc(p.name) + ' (ประเมิน ณ ' + c.evalDate + ')</div></div>' +
     '<div>' + chip + '</div>' +
     '<table class="break"><tbody>' + breakdownRows(c, p) + '</tbody></table>';
 }
@@ -702,13 +706,13 @@ function tabsHtml() {
 }
 
 function noticesHtml() {
-  return '<div class="notice"><b>อัปเดตเกณฑ์ใหม่ พ.ย. 2026:</b> เพิ่มช่องเลือกโบนัสรายได้สูง (High-wage Tiers) สำหรับประสบการณ์ทำงานหรือข้อเสนองาน โดยระบบจะเลือกตัวที่ให้คะแนนสูงกว่าโดยอัตโนมัติ</div>';
+  return '<div class="notice"><b>อัปเดตใหม่:</b> สามารถเปลี่ยน "วันที่ประเมินคะแนน" เพื่อจำลองดูคะแนน CRS และอายุงานในอนาคตได้ทันที!</div>';
 }
 
 function render() {
   const keep = document.activeElement && document.activeElement.id;
   document.getElementById('app').innerHTML =
-    '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะ Express Entry, OINP และ BC PNP พร้อมคำนวณคะแนน CRS (รองรับกฎใหม่ พ.ย. 2026)</p></div>' +
+    '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะ Express Entry, OINP และ BC PNP พร้อมคำนวณคะแนน CRS (คำนวณอนาคตและเกณฑ์ใหม่)</p></div>' +
     '<div class="tabs" id="tabs" role="group" aria-label="เลือกโปรไฟล์">' + tabsHtml() + '</div></header>' +
     '<div id="notices" style="display:flex;flex-direction:column;gap:8px">' + noticesHtml() + '</div>' +
     '<div class="grid"><div class="col" id="tracks">' + trackListHtml() + '</div>' +
@@ -736,6 +740,15 @@ function setCrsField(el) {
     if (f === 'lang1' || f === 'nocCat') p[f] = el.value;
     else p[f] = el.value === '' ? 0 : Number(el.value);
   } else p[f] = el.value;
+
+  // ปรับการคำนวณอายุและอายุงานสดทันทีเมื่อเปลี่ยนวันที่
+  if (f === 'dob' || f === 'targetEvalDate') {
+    const evalDate = p.targetEvalDate || fmtISO(todayD());
+    if (p.dob) {
+      const calcA = calcAgeOnDate(p.dob, evalDate);
+      if (calcA !== null) p.age = calcA;
+    }
+  }
 }
 
 function setTrackField(el) {
