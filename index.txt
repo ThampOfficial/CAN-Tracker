@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IRCC Progress Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #EEF1F4;
+  --surface: #FFFFFF;
+  --surface2: #E6EBF0;
+  --ink: #14213D;
+  --muted: #5A6678;
+  --line: #CFD7E0;
+  --accent: #0B6E6A;
+  --accent-ink: #FFFFFF;
+  --warn: #8A5200;
+  --warn-bg: #FBEFD5;
+  --bad: #B3261E;
+  --bad-bg: #FBE4E1;
+  --ok: #17703F;
+  --ok-bg: #DDF2E6;
+  --f-display: 'Bai Jamjuree', 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --f-body: 'IBM Plex Sans Thai', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1626; --surface: #162136; --surface2: #1E2B44; --ink: #E7ECF4; --muted: #9AA8BE;
+    --line: #2B3A57; --accent: #4CC2BB; --accent-ink: #06201F; --warn: #F0B54E; --warn-bg: #3A2D12;
+    --bad: #FF8A80; --bad-bg: #3C1A18; --ok: #6FD39A; --ok-bg: #12301F; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0;
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-block: 20px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; line-height: 1.2; }
+h1 { font-size: 26px; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 600; }
+h3 { font-size: 15px; font-weight: 600; }
+.sub { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.label { font-size: 12px; letter-spacing: .04em; color: var(--muted); font-weight: 500; }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab {
+  font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); padding: 8px 16px; border-radius: 6px; min-height: 40px;
+}
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tab .mono { margin-left: 8px; font-weight: 500; opacity: .85; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.notice { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
+.notice b { font-weight: 600; }
+.notice.info { background: var(--surface2); color: var(--ink); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.check { flex-direction: row; align-items: center; gap: 8px; }
+input[type=text], input[type=number], input[type=date], select, textarea {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0;
+}
+textarea { min-height: 64px; resize: vertical; }
+input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+.clb { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.clb .field span { font-size: 11px; color: var(--muted); text-align: center; }
+.clb input { text-align: center; padding-inline: 4px; }
+
+.btn {
+  font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: 8px 14px; min-height: 40px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.ghost { border-color: transparent; color: var(--muted); }
+.btn.small { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+
+.stage-stamp {
+  display: inline-block; font-family: var(--f-mono); font-size: 12px; letter-spacing: .03em; text-transform: uppercase;
+  border: 1.5px solid var(--accent); color: var(--accent); padding: 2px 8px; border-radius: 3px;
+}
+.pred { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.pred .big { font-family: var(--f-display); font-size: 20px; font-weight: 600; }
+.bar { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.bar.late > i { background: var(--bad); }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.neutral { background: var(--surface2); color: var(--muted); }
+
+.steps { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.steps li { flex: 1 1 0; min-width: 28px; height: 6px; border-radius: 3px; background: var(--surface2); }
+.steps li.done { background: var(--accent); }
+.steps li.now { background: var(--accent); opacity: .5; }
+
+.score-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.score-num { font-family: var(--f-mono); font-size: 52px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+table.break { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.break td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+table.break td:last-child { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+table.break tr:last-child td { border-bottom: 0; }
+.scroll-x { overflow-x: auto; }
+table.ref { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
+table.ref th, table.ref td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.ref th { color: var(--muted); font-weight: 500; font-size: 12px; }
+table.ref td.n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+details > summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.hist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.hist .mono { color: var(--ink); }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+.foot { color: var(--muted); font-size: 12px; }
+.foot a { color: var(--accent); }
+.savestate { font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .bar > i { transition: width .3s ease; } }
+</style>
+</head>
+<body>
+
+<div id="app" class="wrap"><p class="sub">กำลังโหลด…</p></div>
+
+<script>
+/* ---------- CRS (Express Entry) Tables ---------- */
+const AGE_SINGLE = { 18: 99, 19: 105, 30: 105, 31: 99, 32: 94, 33: 88, 34: 83, 35: 77, 36: 72, 37: 66, 38: 61, 39: 55, 40: 50, 41: 39, 42: 28, 43: 17, 44: 6 };
+const AGE_SPOUSE = { 18: 90, 19: 95, 30: 95, 31: 90, 32: 85, 33: 80, 34: 75, 35: 70, 36: 65, 37: 60, 38: 55, 39: 50, 40: 45, 41: 35, 42: 25, 43: 15, 44: 5 };
+const EDU_SINGLE = [0, 30, 90, 98, 120, 128, 135, 150];
+const EDU_SPOUSE = [0, 28, 84, 91, 112, 119, 126, 140];
+const EDU_LABELS = [
+  'ต่ำกว่ามัธยม', 'มัธยมปลาย', 'อนุปริญญา/หลักสูตร 1 ปี', 'หลักสูตร 2 ปี',
+  'ปริญญาตรี (หรือ 3 ปีขึ้นไป)', 'วุฒิ 2 ใบขึ้นไป (ใบหนึ่ง 3 ปีขึ้นไป)', 'ปริญญาโท / วิชาชีพที่ต้องมีใบอนุญาต', 'ปริญญาเอก'
+];
+const L1_SINGLE = { 4: 6, 5: 6, 6: 9, 7: 17, 8: 23, 9: 31, 10: 34 };
+const L1_SPOUSE = { 4: 6, 5: 6, 6: 8, 7: 16, 8: 22, 9: 29, 10: 32 };
+const CWE_SINGLE = [0, 40, 53, 64, 72, 80];
+const CWE_SPOUSE = [0, 35, 46, 56, 63, 70];
+const SP_EDU = [0, 2, 6, 7, 8, 9, 10, 10];
+const SP_CWE = [0, 5, 7, 8, 9, 10];
+
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const minOf = (arr) => Math.min(...arr.map((v) => clamp(Math.round(num(v)), 0, 10)));
+const lvl = (v) => clamp(Math.round(num(v)), 0, 10);
+
+function agePts(age, spouse) {
+  age = Math.floor(num(age));
+  if (age < 18 || age >= 45) return 0;
+  if (age >= 20 && age <= 29) return spouse ? 100 : 110;
+  return (spouse ? AGE_SPOUSE : AGE_SINGLE)[age] || 0;
+}
+function l1Pts(clb, spouse) {
+  const c = lvl(clb);
+  if (c < 4) return 0;
+  return (spouse ? L1_SPOUSE : L1_SINGLE)[c];
+}
+function l2Pts(clb) {
+  const c = lvl(clb);
+  if (c >= 9) return 6;
+  if (c >= 7) return 3;
+  if (c >= 5) return 1;
+  return 0;
+}
+function spLangPts(clb) {
+  const c = lvl(clb);
+  if (c >= 9) return 5;
+  if (c >= 7) return 3;
+  if (c >= 5) return 1;
+  return 0;
+}
+function eduTier(i) { return i >= 5 ? 2 : i >= 2 ? 1 : 0; }
+
+function computeCRS(p) {
+  const sp = !!p.spouse;
+  const age = agePts(p.age, sp);
+  const edu = (sp ? EDU_SPOUSE : EDU_SINGLE)[clamp(num(p.edu), 0, 7)];
+  const first = p.l1.reduce((s, v) => s + l1Pts(v, sp), 0);
+  const second = Math.min(sp ? 22 : 24, p.l2.reduce((s, v) => s + l2Pts(v), 0));
+  const cwe = (sp ? CWE_SPOUSE : CWE_SINGLE)[clamp(num(p.cwe), 0, 5)];
+  const core = age + edu + first + second + cwe;
+
+  let spouse = 0;
+  if (sp) {
+    spouse = SP_EDU[clamp(num(p.spEdu), 0, 7)] + p.spL.reduce((s, v) => s + spLangPts(v), 0) + SP_CWE[clamp(num(p.spCwe), 0, 5)];
+    spouse = Math.min(40, spouse);
+  }
+
+  const m1 = minOf(p.l1);
+  const langTier = m1 >= 9 ? 2 : m1 >= 7 ? 1 : 0;
+  const cweTier = num(p.cwe) >= 2 ? 2 : num(p.cwe) >= 1 ? 1 : 0;
+  const et = eduTier(num(p.edu));
+  const eduPair = (a, b) => (a === 0 || b === 0) ? 0 : (et === 2 ? (b === 2 ? 50 : 25) : (b === 2 ? 25 : 13));
+  const eduLang = et === 0 ? 0 : eduPair(et, langTier);
+  const eduCwe = et === 0 ? 0 : eduPair(et, cweTier);
+  const fw = num(p.fw);
+  const fwTier = fw >= 3 ? 2 : fw >= 1 ? 1 : 0;
+  const fwPair = (b) => fwTier === 0 || b === 0 ? 0 : (fwTier === 2 ? (b === 2 ? 50 : 25) : (b === 2 ? 25 : 13));
+  const fwLang = fwPair(langTier);
+  const fwCwe = fwPair(cweTier);
+  const cert = p.cert ? (m1 >= 7 ? 50 : m1 >= 5 ? 25 : 0) : 0;
+  const transferParts = {
+    eduLang, eduCwe, fwLang, fwCwe, cert,
+    eduSub: Math.min(50, eduLang + eduCwe),
+    fwSub: Math.min(50, fwLang + fwCwe),
+  };
+  const transfer = Math.min(100, transferParts.eduSub + transferParts.fwSub + cert);
+
+  const frArr = p.lang1 === 'fr' ? p.l1 : p.l2;
+  const enArr = p.lang1 === 'fr' ? p.l2 : p.l1;
+  let french = 0;
+  if (minOf(frArr) >= 7) french = minOf(enArr) >= 5 ? 50 : 25;
+  const study = [0, 15, 30][clamp(num(p.study), 0, 2)];
+  const sibling = p.sibling ? 15 : 0;
+  const pnp = p.pnp ? 600 : 0;
+  const additional = Math.min(600, french + study + sibling + pnp);
+
+  return {
+    age, edu, first, second, cwe, core, spouse, transfer, transferParts,
+    french, study, sibling, pnp, additional,
+    total: core + spouse + transfer + additional,
+  };
+}
+
+/* ---------- Programs & Stages ---------- */
+const PROGRAMS = {
+  ee: {
+    name: 'Express Entry',
+    streams: null,
+    stages: [
+      { label: 'อยู่ใน pool รอ ITA', win: null, mode: 'ee-pool' },
+      { label: 'ได้รับ ITA แล้ว', win: [14, 60], deadline: 60, hint: 'ต้องยื่น PR ภายใน 60 วันหลังได้ ITA' },
+      { label: 'ยื่น PR แล้ว (รอ AOR)', win: [1, 14] },
+      { label: 'ได้ AOR แล้ว (รอชีวมิติ/ตรวจสุขภาพ)', win: [20, 60] },
+      { label: 'ชีวมิติ/ตรวจสุขภาพเสร็จ (รอตรวจสอบ)', win: [60, 150] },
+      { label: 'ได้ PPR / ขั้นสุดท้าย', win: [14, 45] },
+      { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true },
+    ],
+  },
+  bc: {
+    name: 'BC PNP',
+    streams: { si: 'Skills Immigration (SI)', eebc: 'Express Entry BC (EEBC)' },
+    stages: [
+      { label: 'ลงทะเบียน SIRS แล้ว รอ invitation', win: null, mode: 'bc-pool' },
+      { label: 'ได้รับ invitation แล้ว', win: [7, 25], deadline: 25, hint: 'ยื่นใบสมัคร BC PNP ภายใน 25 วัน' },
+      { label: 'ยื่นใบสมัคร BC PNP แล้ว', win: [60, 90] },
+      { label: 'ได้ nomination แล้ว (ยังไม่ยื่น PR)', win: [14, 60] },
+      { label: 'ยื่น PR ที่ IRCC แล้ว', win: (t) => (t.stream === 'eebc' ? [150, 210] : [360, 540]) },
+      { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true },
+    ],
+  },
+  oinp: {
+    name: 'OINP / ONIP (Ontario)',
+    streams: { hc: 'Human Capital (Masters/PhD/HCP)', ejo: 'Employer Job Offer', biz: 'Business' },
+    stages: [
+      { label: 'เตรียมเอกสาร / ตรวจคุณสมบัติ', win: null, mode: 'oinp-prep' },
+      { label: 'ยื่นใบสมัคร OINP แล้ว', win: (t) => ({ hc: [60, 90], ejo: [30, 60], biz: [60, 120] }[t.stream] || [30, 90]) },
+      { label: 'ได้ nomination แล้ว (ยังไม่ยื่น PR)', win: [14, 60], deadline: 180, hint: 'ต้องยื่น PR ภายใน 6 เดือนหลัง nomination' },
+      { label: 'ยื่น PR ที่ IRCC แล้ว', win: [180, 240] },
+      { label: 'ได้ COPR / เป็น PR แล้ว', win: null, final: true },
+    ],
+  },
+};
+const DEFAULT_STREAM = { ee: '', bc: 'si', oinp: 'hc' };
+
+const EE_REF = [
+  { cat: 'Provincial Nominee Program', date: '2026-09-28', crs: 725, ita: 733 },
+  { cat: 'Canadian Experience Class', date: '2026-09-29', crs: 518, ita: 2000 },
+  { cat: 'Trades occupations', date: '2026-10-01', crs: 476, ita: 3500 },
+  { cat: 'Healthcare & social services', date: '2026-09-04', crs: 475, ita: 3500 },
+];
+const EE_CLUSTER_ANCHOR = '2026-09-28';
+const EE_CLUSTER_GAP = 14;
+const BC_REF = [
+  { cat: 'Skilled Worker', date: '2026-06-04', score: 95 },
+  { cat: 'Tech Pilot', date: '2026-06-04', score: 85 },
+  { cat: 'International Graduate', date: '2026-05-21', score: 88 },
+  { cat: 'Skilled Worker (สูงสุดในช่วง เม.ย.)', date: '2026-04-23', score: 108 },
+];
+
+/* ---------- Date Helpers ---------- */
+const DAY = 86400000;
+function parseD(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
+function fmtISO(d) { const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function todayD() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+function diffDays(a, b) { return Math.round((a - b) / DAY); }
+function fmtTH(d) { return d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function fmtSpan(a, b) {
+  const y = a.getFullYear() === b.getFullYear();
+  const f = (d, withY) => d.toLocaleDateString('th-TH-u-ca-gregory', withY ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
+  return f(a, !y) + ' – ' + f(b, true);
+}
+function dur(days) {
+  if (days < 45) return days + ' วัน';
+  const m = days / 30.4;
+  return (Math.round(m * 2) / 2) + ' เดือน';
+}
+
+function winOf(stage, t) { return typeof stage.win === 'function' ? stage.win(t) : stage.win; }
+
+function predict(t, crsTotal) {
+  const prog = PROGRAMS[t.program];
+  const idx = Math.min(Math.max(t.stage, 0), prog.stages.length - 1);
+  const st = prog.stages[idx];
+  const today = todayD();
+  const since = parseD(t.date);
+  const elapsed = diffDays(today, since);
+  const out = { idx, st, elapsed, since, total: prog.stages.length, final: !!st.final };
+  if (st.final) return out;
+
+  if (st.deadline) {
+    const dl = addDays(since, st.deadline);
+    out.deadline = { date: dl, left: diffDays(dl, today) };
+  }
+
+  const w = winOf(st, t);
+  if (w) {
+    out.from = addDays(since, w[0]);
+    out.to = addDays(since, w[1]);
+    out.window = w;
+    out.pct = Math.min(100, Math.max(0, Math.round((elapsed / w[1]) * 100)));
+    out.state = today < out.from ? 'early' : today <= out.to ? 'in' : 'late';
+  } else {
+    out.mode = st.mode;
+  }
+
+  let lo = 0, hi = 0, seenNull = false;
+  for (let i = idx; i < prog.stages.length - 1; i++) {
+    const ww = winOf(prog.stages[i], t);
+    if (!ww) { if (i === idx) seenNull = true; continue; }
+    if (i === idx) { lo += Math.max(0, ww[0] - elapsed); hi += Math.max(0, ww[1] - elapsed); }
+    else { lo += ww[0]; hi += ww[1]; }
+  }
+  out.finish = { from: addDays(today, lo), to: addDays(today, hi), skipped: seenNull };
+  out.restLo = lo;
+  out.restHi = hi;
+
+  if (st.mode === 'ee-pool') {
+    const anchor = parseD(EE_CLUSTER_ANCHOR);
+    let next = anchor;
+    while (next < today) next = addDays(next, EE_CLUSTER_GAP);
+    out.nextDraw = next;
+    out.score = crsTotal;
+  }
+  return out;
+}
+
+/* ---------- State and Storage ---------- */
+const STORE_KEY = 'ircc-tracker-v1';
+const uid = () => 't' + Math.random().toString(36).slice(2, 9);
+
+function newTrack(program, daysAgo, stage) {
+  const d = addDays(todayD(), -(daysAgo || 0));
+  return { id: uid(), program, stream: DEFAULT_STREAM[program], stage: stage || 0, date: fmtISO(d), sirs: '', note: '', history: [{ date: fmtISO(d), stage: stage || 0 }] };
+}
+
+function newProfile(name, over) {
+  return Object.assign({
+    name, spouse: false, age: 30, edu: 4, lang1: 'en', l1: [9, 9, 9, 9], l2: [0, 0, 0, 0],
+    cwe: 1, fw: 0, cert: false, study: 0, sibling: false, pnp: false,
+    spEdu: 0, spL: [0, 0, 0, 0], spCwe: 0, tracks: [],
+  }, over || {});
+}
+
+function defaultState() {
+  const a = newProfile('โปรไฟล์ 1', { tracks: [newTrack('ee', 12, 0)] });
+  const b = newProfile('โปรไฟล์ 2', { age: 32, edu: 6, l1: [8, 8, 8, 8], cwe: 2, tracks: [Object.assign(newTrack('bc', 30, 2), { stream: 'si' })] });
+  return { v: 1, example: true, active: 0, profiles: [a, b] };
+}
+
+function normalize(s) {
+  const base = defaultState();
+  if (!s || !Array.isArray(s.profiles) || s.profiles.length < 2) return base;
+  s.profiles = s.profiles.slice(0, 2).map((p, i) => {
+    const q = Object.assign(newProfile('โปรไฟล์ ' + (i + 1)), p);
+    ['l1', 'l2', 'spL'].forEach((k) => { if (!Array.isArray(q[k]) || q[k].length !== 4) q[k] = [0, 0, 0, 0]; });
+    q.tracks = (Array.isArray(p.tracks) ? p.tracks : []).filter((t) => t && PROGRAMS[t.program]).map((t) => {
+      const base2 = newTrack(t.program);
+      const m = Object.assign(base2, t);
+      if (!Array.isArray(m.history)) m.history = [];
+      return m;
+    });
+    return q;
+  });
+  s.active = s.active === 1 ? 1 : 0;
+  s.v = 1;
+  return s;
+}
+
+let state = null;
+let saveTimer = null;
+
+function readLocal() {
+  try { const raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+function writeLocal() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function setSaveNote(t) {
+  const el = document.getElementById('savestate');
+  if (el) el.textContent = t;
+}
+
+function scheduleSave() {
+  state.example = false;
+  writeLocal();
+  setSaveNote('บันทึกข้อมูลในเบราว์เซอร์แล้ว');
+  clearTimeout(saveTimer);
+}
+
+/* ---------- Rendering Logic ---------- */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cur = () => state.profiles[state.active];
+const opt = (v, label, sel) => '<option value="' + esc(v) + '"' + (String(sel) === String(v) ? ' selected' : '') + '>' + esc(label) + '</option>';
+
+function deadlinePill(p) {
+  if (!p.deadline) return '';
+  const { left, date } = p.deadline;
+  if (left < 0) return '<span class="pill bad">เลยกำหนดมา ' + (-left) + ' วัน (' + fmtTH(date) + ')</span>';
+  if (left <= 14) return '<span class="pill warn">ใกล้ครบกำหนด เหลือ ' + left + ' วัน (' + fmtTH(date) + ')</span>';
+  return '<span class="pill ok">กำหนดส่ง ' + fmtTH(date) + ' (เหลือ ' + left + ' วัน)</span>';
+}
+
+function eePoolHtml(p, t) {
+  const s = p.score;
+  const prof = cur();
+  const cec = EE_REF[1].crs, trades = EE_REF[2].crs, hc = EE_REF[3].crs, pnp = EE_REF[0].crs;
+  let verdict;
+  if (prof.pnp) {
+    verdict = s >= pnp
+      ? '<span class="pill ok">คะแนนรวม ' + s + ' สูงกว่า cutoff PNP ล่าสุด (' + pnp + ')</span>'
+      : '<span class="pill warn">คะแนนรวม ' + s + ' ต่ำกว่า cutoff PNP ล่าสุด (' + pnp + ') อยู่ ' + (pnp - s) + ' คะแนน</span>';
+  } else if (s >= cec) {
+    verdict = '<span class="pill ok">' + s + ' สูงกว่า cutoff CEC ล่าสุด (' + cec + ') ถ้าเข้าเกณฑ์ CEC มีโอกาสในรอบถัดไป</span>';
+  } else if (s >= Math.min(trades, hc)) {
+    verdict = '<span class="pill warn">' + s + ' ต่ำกว่า CEC (' + cec + ') อยู่ ' + (cec - s) + ' คะแนน แต่ผ่าน cutoff สาย trades/healthcare ถ้าอาชีพตรง category</span>';
+  } else {
+    verdict = '<span class="pill bad">' + s + ' ต่ำกว่า cutoff ทุกสายใน draw ล่าสุด (CEC ' + cec + ' ขาดอีก ' + (cec - s) + ')</span>';
+  }
+  return '<div class="big">รอบ draw ถัดไปคาดว่า ~' + fmtTH(p.nextDraw) + '</div>' +
+    '<div>' + verdict + '</div>' +
+    '<div class="sub">ใช้คะแนนของ "' + esc(prof.name) + '" เทียบ ตัวเลขรอบล่าสุดเป็นประมาณการ หลังได้ ITA ปกติใช้เวลาอีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
+}
+
+function bcPoolHtml(p, t) {
+  const v = t.sirs === '' ? null : Number(t.sirs);
+  let verdict;
+  if (v == null || !Number.isFinite(v)) verdict = '<span class="pill neutral">ใส่คะแนน SIRS เพื่อเทียบกับ cutoff</span>';
+  else if (v >= 108) verdict = '<span class="pill ok">SIRS ' + v + ' ระดับสูงสุดของ cutoff ที่เคยประกาศในปีนี้ (108)</span>';
+  else if (v >= 95) verdict = '<span class="pill ok">SIRS ' + v + ' เทียบเท่า cutoff Skilled Worker ล่าสุด (95)</span>';
+  else if (v >= 80) verdict = '<span class="pill warn">SIRS ' + v + ' อยู่ช่วงล่าง cutoff แต่ละสตรีมเคยอยู่ที่ 80–110 ขึ้นกับรอบและอาชีพ</span>';
+  else verdict = '<span class="pill bad">SIRS ' + v + ' ต่ำกว่าช่วง cutoff ที่เคยประกาศ (80–110)</span>';
+  return '<div class="big">invitation รอบถัดไปอยู่ในรอบ draw ราว 2 สัปดาห์</div>' +
+    '<div>' + verdict + '</div>' +
+    '<div class="sub">เวลารอจริงขึ้นกับคะแนนและสตรีมของคุณ หลังได้ invitation ปกติใช้อีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
+}
+
+function oinpPrepHtml(p, t) {
+  const w = winOf(PROGRAMS.oinp.stages[1], t);
+  return '<div class="big">ขั้นนี้ขึ้นกับความพร้อมของคุณ</div>' +
+    '<div class="sub">เมื่อยื่นใบสมัคร OINP แล้ว ให้เปลี่ยนขั้นตอนเป็น "ยื่นใบสมัคร" ปกติรอ nomination ราว ' + dur(w[0]) + ' – ' + dur(w[1]) + ' และจนถึง PR ราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + '</div>';
+}
+
+function predHtml(t) {
+  const p = predict(t, computeCRS(cur()).total);
+  const prog = PROGRAMS[t.program];
+  if (p.final) {
+    return '<span class="pill ok">เสร็จสิ้นแล้ว</span><div class="sub">ถึงขั้นสุดท้ายเมื่อ ' + fmtTH(p.since) + '</div>';
+  }
+  const next = prog.stages[p.idx + 1];
+  let body = '';
+  if (p.mode === 'ee-pool') body = eePoolHtml(p, t);
+  else if (p.mode === 'bc-pool') body = bcPoolHtml(p, t);
+  else if (p.mode === 'oinp-prep') body = oinpPrepHtml(p, t);
+  else {
+    const label = p.state === 'early' ? '<span class="pill neutral">ยังไม่ถึงช่วงปกติ อีก ' + diffDays(p.from, todayD()) + ' วัน</span>'
+      : p.state === 'in' ? '<span class="pill ok">อยู่ในช่วงที่คาดไว้</span>'
+      : '<span class="pill bad">เกินช่วงปกติมา ' + diffDays(todayD(), p.to) + ' วัน</span>';
+    body = '<div class="big">ขั้นถัดไปคาดว่า ' + fmtSpan(p.from, p.to) + '</div>' +
+      '<div>' + label + '</div>' +
+      '<div class="bar' + (p.state === 'late' ? ' late' : '') + '"><i style="width:' + p.pct + '%"></i></div>' +
+      '<div class="sub">ผ่านมา ' + p.elapsed + ' วัน จากช่วงปกติ ' + dur(p.window[0]) + ' – ' + dur(p.window[1]) + (next ? ' | ถัดไป: ' + esc(next.label) : '') + '</div>' +
+      '<div class="sub">ครบทั้งกระบวนการโดยประมาณ <span class="mono">' + fmtSpan(p.finish.from, p.finish.to) + '</span></div>';
+  }
+  const dl = deadlinePill(p);
+  return body + (dl ? '<div>' + dl + '</div>' : '') + (p.st.hint ? '<div class="sub">' + esc(p.st.hint) + '</div>' : '');
+}
+
+function trackHtml(t) {
+  const prog = PROGRAMS[t.program];
+  const idx = Math.min(t.stage, prog.stages.length - 1);
+  const dots = prog.stages.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '" title="' + esc(s.label) + '"></li>').join('');
+  const streamField = prog.streams
+    ? '<div class="field"><label class="label" for="' + t.id + '-stream">สตรีม</label><select id="' + t.id + '-stream" data-t="' + t.id + '" data-tf="stream">' +
+      Object.keys(prog.streams).map((k) => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>'
+    : '';
+  const sirs = t.program === 'bc'
+    ? '<div class="field"><label class="label" for="' + t.id + '-sirs">คะแนน SIRS ของคุณ (ถ้ามี)</label><input type="number" inputmode="numeric" min="0" max="200" id="' + t.id + '-sirs" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>'
+    : '';
+  const hist = (t.history || []).slice().reverse().map((h) => {
+    const s = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
+    return '<li><span class="mono">' + esc(h.date) + '</span> ' + esc(s.label) + '</li>';
+  }).join('');
+  return '<section class="card" aria-label="' + esc(prog.name) + '">' +
+    '<div class="card-head"><div><span class="stage-stamp">' + esc(prog.name) + '</span></div>' +
+    '<button class="btn ghost small" data-act="del-track" data-t="' + t.id + '" id="' + t.id + '-del">ลบ</button></div>' +
+    '<div class="row">' +
+    '<div class="field"><label class="label" for="' + t.id + '-prog">โปรแกรม</label><select id="' + t.id + '-prog" data-t="' + t.id + '" data-tf="program">' +
+    Object.keys(PROGRAMS).map((k) => opt(k, PROGRAMS[k].name, t.program)).join('') + '</select></div>' + streamField + '</div>' +
+    '<div class="row">' +
+    '<div class="field"><label class="label" for="' + t.id + '-stage">ตอนนี้อยู่ขั้นตอน</label><select id="' + t.id + '-stage" data-t="' + t.id + '" data-tf="stage">' +
+    prog.stages.map((s, i) => opt(i, (i + 1) + '. ' + s.label, idx)).join('') + '</select></div>' +
+    '<div class="field"><label class="label" for="' + t.id + '-date">วันที่อัปเดตสถานะนี้</label><input type="date" id="' + t.id + '-date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' +
+    sirs + '</div>' +
+    '<ol class="steps" aria-label="ความคืบหน้า ' + (idx + 1) + ' จาก ' + prog.stages.length + '">' + dots + '</ol>' +
+    '<div class="pred" id="pred-' + t.id + '">' + predHtml(t) + '</div>' +
+    '<div class="field"><label class="label" for="' + t.id + '-note">บันทึก (เลข application, ข้อสังเกต)</label><textarea id="' + t.id + '-note" data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
+    '<details><summary>ประวัติการอัปเดต (' + (t.history || []).length + ')</summary><ul class="hist">' + (hist || '<li>ยังไม่มีประวัติ</li>') + '</ul></details>' +
+    '</section>';
+}
+
+function trackListHtml() {
+  const p = cur();
+  const cards = p.tracks.map(trackHtml).join('');
+  return (cards || '<div class="card"><div class="empty">ยังไม่มีรายการติดตามสำหรับ ' + esc(p.name) + ' กด "เพิ่มรายการติดตาม" เพื่อเริ่ม</div></div>') +
+    '<button class="btn primary" id="add-track" data-act="add-track">+ เพิ่มรายการติดตาม</button>';
+}
+
+const CWE_LABELS = ['น้อยกว่า 1 ปี', '1 ปี', '2 ปี', '3 ปี', '4 ปี', '5 ปีขึ้นไป'];
+const FW_LABELS = [[0, 'ไม่มี'], [1, '1–2 ปี'], [3, '3 ปีขึ้นไป']];
+const STUDY_LABELS = ['ไม่มี', 'วุฒิในแคนาดา 1–2 ปี', 'วุฒิในแคนาดา 3 ปีขึ้นไป'];
+const SKILLS = ['ฟัง', 'พูด', 'อ่าน', 'เขียน'];
+
+function clbRow(arr, f, ix, label) {
+  return '<div class="field"><span class="label">' + label + '</span><div class="clb">' +
+    arr.map((v, k) => '<div class="field"><input type="number" inputmode="numeric" min="0" max="10" id="p' + ix + '-' + f + '-' + k + '" data-f="' + f + '" data-k="' + k + '" value="' + esc(v) + '" aria-label="' + label + ' ' + SKILLS[k] + '"><span>' + SKILLS[k] + '</span></div>').join('') +
+    '</div></div>';
+}
+
+function selectF(ix, f, label, options, val) {
+  return '<div class="field"><label class="label" for="p' + ix + '-' + f + '">' + label + '</label><select id="p' + ix + '-' + f + '" data-f="' + f + '">' +
+    options.map(([v, l]) => opt(v, l, val)).join('') + '</select></div>';
+}
+function checkF(ix, f, label, val) {
+  return '<div class="field check"><input type="checkbox" id="p' + ix + '-' + f + '" data-f="' + f + '"' + (val ? ' checked' : '') + '><label for="p' + ix + '-' + f + '">' + label + '</label></div>';
+}
+
+function crsFormHtml() {
+  const ix = state.active;
+  const p = cur();
+  const eduOpts = EDU_LABELS.map((l, i) => [i, l]);
+  let h = '<section class="card" aria-label="ข้อมูลโปรไฟล์">' +
+    '<div class="card-head"><h2>ข้อมูลโปรไฟล์ (Express Entry CRS)</h2></div>' +
+    '<div class="field"><label class="label" for="p' + ix + '-name">ชื่อโปรไฟล์</label><input type="text" id="p' + ix + '-name" data-f="name" maxlength="40" value="' + esc(p.name) + '"></div>' +
+    '<div class="row">' +
+    '<div class="field"><label class="label" for="p' + ix + '-age">อายุ</label><input type="number" inputmode="numeric" min="17" max="60" id="p' + ix + '-age" data-f="age" value="' + esc(p.age) + '"></div>' +
+    selectF(ix, 'lang1', 'ภาษาแรกที่สอบ', [['en', 'อังกฤษ (CLB)'], ['fr', 'ฝรั่งเศส (NCLC)']], p.lang1) +
+    '</div>' +
+    selectF(ix, 'edu', 'การศึกษาสูงสุด', eduOpts, p.edu) +
+    clbRow(p.l1, 'l1', ix, 'ภาษาแรก ระดับต่อทักษะ (CLB 0–10)') +
+    clbRow(p.l2, 'l2', ix, 'ภาษาที่สอง ระดับต่อทักษะ (ใส่ 0 ถ้าไม่มี)') +
+    '<div class="row">' +
+    selectF(ix, 'cwe', 'ประสบการณ์ทำงานในแคนาดา', CWE_LABELS.map((l, i) => [i, l]), p.cwe) +
+    selectF(ix, 'fw', 'ประสบการณ์ทำงานต่างประเทศ', FW_LABELS, p.fw) +
+    '</div>' +
+    '<div class="row">' + checkF(ix, 'cert', 'มี Certificate of Qualification (trades)', p.cert) + '</div>' +
+    '<h3>คะแนนเพิ่ม</h3>' +
+    '<div class="row">' + selectF(ix, 'study', 'เรียนต่อในแคนาดา', STUDY_LABELS.map((l, i) => [i, l]), p.study) + '</div>' +
+    '<div class="row">' + checkF(ix, 'sibling', 'มีพี่น้องเป็นพลเมือง/PR ในแคนาดา (+15)', p.sibling) +
+    checkF(ix, 'pnp', 'ได้รับ provincial nomination (+600)', p.pnp) + '</div>' +
+    '<h3>คู่สมรส</h3>' + checkF(ix, 'spouse', 'มีคู่สมรส/คู่ชีวิตที่ไปด้วย', p.spouse);
+  if (p.spouse) {
+    h += '<div class="row">' + selectF(ix, 'spEdu', 'การศึกษาของคู่สมรส', eduOpts, p.spEdu) +
+      selectF(ix, 'spCwe', 'งานในแคนาดาของคู่สมรส', CWE_LABELS.map((l, i) => [i, l]), p.spCwe) + '</div>' +
+      clbRow(p.spL, 'spL', ix, 'ภาษาแรกของคู่สมรส (CLB 0–10)');
+  }
+  return h + '</section>';
+}
+
+function breakdownRows(c, p) {
+  const r = (a, b) => '<tr><td>' + a + '</td><td>' + b + '</td></tr>';
+  let h = r('อายุ', c.age) + r('การศึกษา', c.edu) + r('ภาษาแรก', c.first) + r('ภาษาที่สอง', c.second) + r('งานในแคนาดา', c.cwe) +
+    r('<b>รวมส่วนหลัก</b>', '<b>' + c.core + '</b>');
+  if (p.spouse) h += r('คู่สมรส', c.spouse);
+  h += r('Skill transferability', c.transfer);
+  h += r('ภาษาฝรั่งเศสเพิ่ม', c.french) + r('เรียนในแคนาดา', c.study) + r('พี่น้องในแคนาดา', c.sibling) + r('Provincial nomination', c.pnp);
+  return h;
+}
+
+function scoreBoxHtml() {
+  const p = cur();
+  const c = computeCRS(p);
+  const cec = EE_REF[1].crs;
+  const gap = c.total - cec;
+  const chip = p.pnp ? '' : gap >= 0
+    ? '<span class="pill ok">สูงกว่า CEC cutoff ล่าสุด ' + gap + '</span>'
+    : '<span class="pill warn">ต่ำกว่า CEC cutoff ล่าสุด ' + (-gap) + '</span>';
+  return '<div class="score-top"><div class="score-num" id="score-num">' + c.total + '</div><div class="label">คะแนน CRS ของ ' + esc(p.name) + '</div></div>' +
+    '<div>' + chip + '</div>' +
+    '<table class="break"><tbody>' + breakdownRows(c, p) + '</tbody></table>';
+}
+
+function compareHtml() {
+  const [a, b] = state.profiles.map((p) => computeCRS(p));
+  const row = (l, x, y) => '<tr><td>' + l + '</td><td class="n">' + x + '</td><td class="n">' + y + '</td></tr>';
+  return '<details class="card"><summary>เทียบสองโปรไฟล์</summary><div class="scroll-x"><table class="ref"><thead><tr><th></th><th>' + esc(state.profiles[0].name) + '</th><th>' + esc(state.profiles[1].name) + '</th></tr></thead><tbody>' +
+    row('ส่วนหลัก', a.core, b.core) + row('คู่สมรส', a.spouse, b.spouse) + row('Skill transferability', a.transfer, b.transfer) +
+    row('คะแนนเพิ่ม', a.additional, b.additional) + row('<b>รวม</b>', '<b>' + a.total + '</b>', '<b>' + b.total + '</b>') +
+    '</tbody></table></div></details>';
+}
+
+function tabsHtml() {
+  return state.profiles.map((p, i) => {
+    const c = computeCRS(p).total;
+    return '<button class="tab" id="tab-' + i + '" data-act="tab" data-i="' + i + '" aria-pressed="' + (i === state.active) + '">' + esc(p.name) + '<span class="mono" id="tabscore-' + i + '">' + c + '</span></button>';
+  }).join('');
+}
+
+function noticesHtml() {
+  let h = '';
+  if (state.example) h += '<div class="notice"><b>ข้อมูลตัวอย่าง</b> แก้ค่าในฟอร์มเป็นข้อมูลของคุณ ข้อมูลจะถูกบันทึกอัตโนมัติในเบราว์เซอร์นี้</div>';
+  h += '<div class="notice info">IRCC ปรับปรุงการให้คะแนน Job Offer และระบบคำนวณ CRS ให้สอดคล้องกับระเบียบใหม่ในเดือนพฤศจิกายน 2026</div>';
+  return h;
+}
+
+function render() {
+  const keep = document.activeElement && document.activeElement.id;
+  document.getElementById('app').innerHTML =
+    '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะ Express Entry, OINP และ BC PNP พร้อมคำนวณคะแนน CRS</p></div>' +
+    '<div class="tabs" id="tabs" role="group" aria-label="เลือกโปรไฟล์">' + tabsHtml() + '</div></header>' +
+    '<div id="notices" style="display:flex;flex-direction:column;gap:8px">' + noticesHtml() + '</div>' +
+    '<div class="grid"><div class="col" id="tracks">' + trackListHtml() + '</div>' +
+    '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + '<div id="compare">' + compareHtml() + '</div></div></div>' +
+    '<p class="foot"><span class="savestate" id="savestate"></span><br>' +
+    'ระยะเวลาเป็นการประมาณการจากบทความข่าวและระยะเวลาทั่วไป ตรวจสอบระยะเวลาประมวลผลล่าสุดที่ canada.ca ก่อนวางแผน</p>';
+  if (keep) { const el = document.getElementById(keep); if (el) el.focus(); }
+}
+
+function refreshLive() {
+  const sb = document.getElementById('scorebox');
+  if (sb) sb.innerHTML = scoreBoxHtml();
+  state.profiles.forEach((p, i) => { const el = document.getElementById('tabscore-' + i); if (el) el.textContent = computeCRS(p).total; });
+  cur().tracks.forEach((t) => { const el = document.getElementById('pred-' + t.id); if (el) el.innerHTML = predHtml(t); });
+  const cmp = document.getElementById('compare');
+  if (cmp && !cmp.querySelector('details[open]')) cmp.innerHTML = compareHtml();
+}
+
+function setCrsField(el) {
+  const p = cur();
+  const f = el.dataset.f;
+  if (el.type === 'checkbox') p[f] = el.checked;
+  else if (el.dataset.k !== undefined) p[f][Number(el.dataset.k)] = el.value === '' ? 0 : Number(el.value);
+  else if (el.type === 'number' || el.tagName === 'SELECT') p[f] = (f === 'lang1') ? el.value : (el.value === '' ? 0 : Number(el.value));
+  else p[f] = el.value;
+}
+
+function setTrackField(el) {
+  const p = cur();
+  const t = p.tracks.find((x) => x.id === el.dataset.t);
+  if (!t) return false;
+  const f = el.dataset.tf;
+  let rerender = false;
+  if (f === 'program') {
+    t.program = el.value; t.stage = 0; t.stream = DEFAULT_STREAM[t.program]; t.date = fmtISO(todayD());
+    t.history = [{ date: t.date, stage: 0 }]; rerender = true;
+  } else if (f === 'stage') {
+    t.stage = Number(el.value); t.date = fmtISO(todayD());
+    t.history.push({ date: t.date, stage: t.stage }); rerender = true;
+  } else if (f === 'date') {
+    if (el.value) { t.date = el.value; if (t.history.length) t.history[t.history.length - 1].date = t.date; }
+  } else if (f === 'stream') { t.stream = el.value; rerender = true; }
+  else t[f] = el.value;
+  return rerender;
+}
+
+function onInput(e) {
+  const el = e.target;
+  if (el.dataset.f) {
+    setCrsField(el); scheduleSave();
+    const tab = document.getElementById('tab-' + state.active);
+    if (el.dataset.f === 'name' && tab) tab.firstChild.nodeValue = cur().name;
+    refreshLive();
+  } else if (el.dataset.t && (el.dataset.tf === 'sirs' || el.dataset.tf === 'note')) {
+    setTrackField(el); scheduleSave();
+    const t = cur().tracks.find((x) => x.id === el.dataset.t);
+    const pr = document.getElementById('pred-' + el.dataset.t);
+    if (t && pr) pr.innerHTML = predHtml(t);
+  }
+}
+
+function onChange(e) {
+  const el = e.target;
+  if (el.dataset.f) { setCrsField(el); scheduleSave(); render(); }
+  else if (el.dataset.t) { setTrackField(el); scheduleSave(); render(); }
+}
+
+function onClick(e) {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'tab') { state.active = Number(b.dataset.i); writeLocal(); render(); }
+  else if (act === 'add-track') { cur().tracks.push(newTrack('ee', 0, 0)); scheduleSave(); render(); }
+  else if (act === 'del-track') {
+    const p = cur();
+    p.tracks = p.tracks.filter((t) => t.id !== b.dataset.t);
+    scheduleSave(); render();
+  }
+}
+
+function start() {
+  state = normalize(readLocal());
+  document.addEventListener('input', onInput);
+  document.addEventListener('change', onChange);
+  document.addEventListener('click', onClick);
+  render();
+}
+start();
+</script>
+</body>
+</html>
