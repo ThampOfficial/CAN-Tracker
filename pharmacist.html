@@ -67,8 +67,16 @@ textarea { min-height: 64px; resize: vertical; }
 .timeline-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2); padding: 8px 10px; border-radius: 4px; gap: 8px; flex-wrap: wrap; }
 .timeline-item input[type=date] { width: 130px; min-height: 32px; font-size: 12px; padding: 2px 6px; }
 
+/* กล่องแสดงตัวเลขนับวันขนาดใหญ่ */
+.hero-counter {
+  background: var(--surface); border: 2px solid var(--accent); border-radius: 8px; padding: 16px 20px;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.hero-num-group { display: flex; align-items: baseline; gap: 8px; }
+.hero-num { font-family: monospace; font-size: 48px; font-weight: 700; color: var(--accent); line-height: 1; }
+.hero-unit { font-size: 18px; font-weight: 600; color: var(--muted); }
+
 .foot { color: var(--muted); font-size: 12px; }
-.counter-box { background: var(--surface2); padding: 10px 14px; border-radius: 6px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
 </style>
 
 <div id="app" class="wrap">
@@ -123,7 +131,7 @@ const PHARM_STAGES = [
   { label: '10. Final Licensure & Registration (ใบอนุญาตเต็มตัว)', win: [14, 30], final: true }
 ];
 
-const STORE_KEY = 'pharm-tracker-v3';
+const STORE_KEY = 'pharm-tracker-v4';
 const DAY = 86400000;
 
 function parseD(s) { if (!s) return todayD(); const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
@@ -159,7 +167,7 @@ function render() {
 
   const dots = PHARM_STAGES.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '" title="' + esc(s.label) + '"></li>').join('');
 
-  // คำนวณจำนวนวันที่ผ่านไปตั้งแต่จุดเริ่มต้น (Start Date) จนถึงวันนี้
+  // คำนวณจำนวนวันที่ผ่านไปตั้งแต่วันเริ่มต้น (Day 1) จนถึงปัจจุบัน
   const startD = parseD(state.startDate || state.date);
   const nowD = todayD();
   const totalElapsedDays = Math.max(0, diffDays(nowD, startD));
@@ -205,14 +213,23 @@ function render() {
       '</div>';
   }
 
-  const mainHtml = '<section class="card">' +
-    '<div class="card-head"><h2>ติดตามความคืบหน้า (Pharmacist Path)</h2><span class="stage-stamp">BC -> TORONTO</span></div>' +
-    
-    '<div class="counter-box">' +
-      '<div>📅 <b>วันที่เริ่มต้นกระบวนการทั้งหมด (Day 1):</b> <input type="date" id="start-date-input" value="' + esc(state.startDate || state.date) + '" style="width:140px;display:inline-block;margin-left:8px;"></div>' +
-      '<div>⏳ ดำเนินการมาแล้ว: <b style="color:var(--accent);font-size:16px;">' + totalElapsedDays + '</b> วัน</div>' +
+  const mainHtml = 
+    '<div class="hero-counter">' +
+      '<div>' +
+        '<div class="label" style="text-transform:uppercase;letter-spacing:.05em;">ทั้งกระบวนการดำเนินการรอนานแล้ว</div>' +
+        '<div class="hero-num-group">' +
+          '<span class="hero-num">' + totalElapsedDays + '</span>' +
+          '<span class="hero-unit">วัน</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">' +
+        '<label class="label">📅 วันเริ่มต้นกระบวนการทั้งหมด (Day 1)</label>' +
+        '<input type="date" id="start-date-input" value="' + esc(state.startDate || state.date) + '" style="width:150px;">' +
+      '</div>' +
     '</div>' +
 
+    '<section class="card">' +
+    '<div class="card-head"><h2>ติดตามความคืบหน้า (Pharmacist Path)</h2><span class="stage-stamp">BC -> TORONTO</span></div>' +
     '<div class="row">' +
       '<div class="field" style="grid-column: span 2;"><label class="label">ขั้นตอนปัจจุบัน (' + (idx + 1) + '/' + PHARM_STAGES.length + ')</label><select id="stage-select">' + PHARM_STAGES.map((s, i) => opt(i, s.label, idx)).join('') + '</select></div>' +
       '<div class="field"><label class="label">วันที่อัปเดตสเต็ปนี้</label><input type="date" id="date-input" value="' + esc(state.date) + '"></div>' +
