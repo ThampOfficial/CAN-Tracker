@@ -68,13 +68,14 @@ textarea { min-height: 64px; resize: vertical; }
 .timeline-item input[type=date] { width: 130px; min-height: 32px; font-size: 12px; padding: 2px 6px; }
 
 .foot { color: var(--muted); font-size: 12px; }
+.counter-box { background: var(--surface2); padding: 10px 14px; border-radius: 6px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
 </style>
 
 <div id="app" class="wrap">
   <header class="top">
     <div>
       <h1>Canadian Pharmacist Licensing Tracker</h1>
-      <p class="sub">ติดตามขั้นตอนการขอใบอนุญาตประกอบวิชาชีพเภสัชกรในแคนาดา (BC -> Toronto Path)</p>
+      <p class="sub">ติดตามกระบวนการขอใบอนุญาตเภสัชกร (BC $\rightarrow$ Toronto Path)</p>
     </div>
     <div class="nav-tabs">
       <a href="index.html" class="nav-tab">PR Tracker</a>
@@ -83,25 +84,24 @@ textarea { min-height: 64px; resize: vertical; }
   </header>
 
   <div class="notice">
-    <b>💊 เส้นทางแผนปัจจุบัน (BC -> Toronto):</b> สอบ PEBC (EE, MCQ, IELTS, OSCE) ให้เรียบร้อยใน BC แล้วย้ายไปลงทะเบียน OCP, สอบกฎหมาย Toronto (JE), ฝึกงาน (SPT) และอบรมใบวัคซีน
+    <b>💊 แผนปัจจุบัน:</b> สอบ MCQ และ OSCE ใน BC $\rightarrow$ สอบภาษา IELTS $\rightarrow$ สอบกฎหมาย Toronto (JE ออนไลน์) $\rightarrow$ ย้ายไป Toronto ทำ PACE/SPT $\rightarrow$ ฉีดวัคซีน $\rightarrow$ รับใบอนุญาต
   </div>
 
   <div class="grid">
     <div class="col" id="main-track"></div>
     <div class="col">
       <section class="card">
-        <h2>📌 ลำดับแผนงาน (BC -> Toronto)</h2>
-        <p class="sub">สรุปสเต็ปสำคัญตามแผนของคุณ</p>
-        <ol style="padding-left: 20px; margin: 0; font-size: 13px; display: flex; flex-direction: column; gap: 8px;">
-          <li><b>PEBC Document Evaluation & EE</b> (ใน BC)</li>
-          <li><b>PEBC Qualifying Part I (MCQ)</b> (ทำงาน Pharmacy Assistant ใน BC ควบคู่ได้)</li>
-          <li><b>Language Proficiency (IELTS/CELPIP)</b> (สอบหลัง MCQ)</li>
-          <li><b>PEBC Qualifying Part II (OSCE)</b> (สอบใน BC ให้เรียบร้อย)</li>
-          <li><b>ย้ายไป Toronto & Register OCP</b> (ลงทะเบียนสภาจังหวัด Ontario)</li>
-          <li><b>Jurisprudence Exam (JE - Toronto)</b> (สอบกฎหมายมณฑล Ontario)</li>
-          <li><b>Structured Practical Training (SPT)</b> (เก็บชั่วโมงฝึกงานใน Ontario)</li>
-          <li><b>Injection Certification</b> (อบรมและสอบใบอนุญาตฉีดวัคซีน)</li>
-          <li><b>Full Licensure (RPh)</b> (รับใบอนุญาตเภสัชกรเต็มตัว)</li>
+        <h2>📌 ลำดับแผนงานตามที่คุณตั้งไว้</h2>
+        <ol style="padding-left: 20px; margin: 0; font-size: 13px; display: flex; flex-direction: column; gap: 6px;">
+          <li><b>Document Evaluation & EE</b> (ใน BC)</li>
+          <li><b>PEBC Qualifying Part I (MCQ)</b></li>
+          <li><b>PEBC Qualifying Part II (OSCE)</b> (สอบใน BC ให้จบ)</li>
+          <li><b>Language Proficiency (IELTS)</b></li>
+          <li><b>Ontario Jurisprudence Exam (JE)</b> (สอบออนไลน์จาก BC)</li>
+          <li><b>ย้ายไป Toronto & Register OCP</b></li>
+          <li><b>SPT / PACE (ฝึกงานที่ Toronto)</b></li>
+          <li><b>Injection Certification</b></li>
+          <li><b>Full Licensure (RPh)</b></li>
         </ol>
       </section>
     </div>
@@ -111,25 +111,26 @@ textarea { min-height: 64px; resize: vertical; }
 
 <script>
 const PHARM_STAGES = [
-  { label: '1. Document Evaluation (ประเมินวุฒิกับ PEBC)', win: [60, 120], hint: 'ยื่นเอกสารประเมินปริญญาเภสัชศาสตร์กับ PEBC' },
-  { label: '2. PEBC Evaluating Examination (EE)', win: [90, 180], hint: 'สอบประเมินความรู้พื้นฐานทางเภสัชศาสตร์' },
-  { label: '3. PEBC Qualifying Examination Part I (MCQ)', win: [90, 180], hint: 'สอบข้อเขียน (ในระหว่างนี้ทำงานเป็น Pharmacy Assistant/Student ใน BC ได้)' },
-  { label: '4. Language Proficiency Test (สอบภาษา IELTS/CELPIP)', win: [30, 90], hint: 'สอบภาษาอังกฤษหลังผ่าน MCQ ตามแผนที่วางไว้' },
-  { label: '5. PEBC Qualifying Examination Part II (OSCE)', win: [90, 180], hint: 'สอบปฏิบัติ OSCE ใน BC ให้เรียบร้อยก่อนย้ายมณฑล' },
-  { label: '6. Provincial Registration (ย้ายไป Toronto & ลงทะเบียน OCP)', win: [14, 45], hint: 'ย้ายไปโตรอนโต้ และลงทะเบียนเป็น Pre-registrant กับ OCP (Ontario College of Pharmacists)' },
-  { label: '7. Pharmacy Jurisprudence Examination (JE - Toronto)', win: [30, 60], hint: 'สอบกฎหมายและจริยธรรมเภสัชกรรมมณฑล Ontario' },
-  { label: '8. Structured Practical Training (SPT / Internship - Toronto)', win: [90, 180], hint: 'เก็บชั่วโมงฝึกงานใน Ontario ตามเกณฑ์ที่ OCP กำหนด' },
-  { label: '9. Injection Certification (อบรมและสอบใบฉีดวัคซีน)', win: [14, 30], hint: 'ผ่านหลักสูตรอบรมการฉีดวัคซีนและยาฉีดตามเกณฑ์ OCP' },
-  { label: '10. Final Licensure & Registration (ใบอนุญาตเภสัชกรเต็มตัว)', win: [14, 30], final: true, hint: 'ขึ้นทะเบียนเป็น Registered Pharmacist (RPh) เต็มตัวใน Ontario' }
+  { label: '1. Document Evaluation (ประเมินวุฒิกับ PEBC)', win: [60, 120] },
+  { label: '2. PEBC Evaluating Examination (EE)', win: [90, 180] },
+  { label: '3. PEBC Qualifying Examination Part I (MCQ)', win: [90, 180] },
+  { label: '4. PEBC Qualifying Examination Part II (OSCE)', win: [90, 180] },
+  { label: '5. Language Proficiency Test (IELTS)', win: [30, 90] },
+  { label: '6. Ontario Jurisprudence Exam (JE - ออนไลน์)', win: [30, 60] },
+  { label: '7. Provincial Registration (ย้ายไป Toronto & OCP)', win: [14, 45] },
+  { label: '8. Structured Practical Training (SPT / PACE)', win: [90, 180] },
+  { label: '9. Injection Certification (ใบอนุญาตฉีดวัคซีน)', win: [14, 30] },
+  { label: '10. Final Licensure & Registration (ใบอนุญาตเต็มตัว)', win: [14, 30], final: true }
 ];
 
-const STORE_KEY = 'pharm-tracker-v2';
+const STORE_KEY = 'pharm-tracker-v3';
 const DAY = 86400000;
 
 function parseD(s) { if (!s) return todayD(); const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
 function fmtISO(d) { const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function todayD() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
 function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+function diffDays(a, b) { return Math.round((a - b) / DAY); }
 function fmtSpan(a, b) {
   const y = a.getFullYear() === b.getFullYear();
   const f = (d, withY) => d.toLocaleDateString('th-TH-u-ca-gregory', withY ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
@@ -143,7 +144,7 @@ function readState() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
-  return { stage: 0, date: fmtISO(todayD()), note: '', history: [{ stage: 0, date: fmtISO(todayD()) }] };
+  return { stage: 0, startDate: fmtISO(todayD()), date: fmtISO(todayD()), note: '', history: [{ stage: 0, date: fmtISO(todayD()) }] };
 }
 
 function writeState(s) {
@@ -157,6 +158,11 @@ function render() {
   const curStage = PHARM_STAGES[idx];
 
   const dots = PHARM_STAGES.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '" title="' + esc(s.label) + '"></li>').join('');
+
+  // คำนวณจำนวนวันที่ผ่านไปตั้งแต่จุดเริ่มต้น (Start Date) จนถึงวันนี้
+  const startD = parseD(state.startDate || state.date);
+  const nowD = todayD();
+  const totalElapsedDays = Math.max(0, diffDays(nowD, startD));
 
   const seen = new Set();
   const sortedHist = [...(state.history || [])].sort((a, b) => a.stage - b.stage);
@@ -200,13 +206,18 @@ function render() {
   }
 
   const mainHtml = '<section class="card">' +
-    '<div class="card-head"><h2>ติดตามความคืบหน้า (Pharmacist Path)</h2><span class="stage-stamp">BC -> TORONTO PATH</span></div>' +
+    '<div class="card-head"><h2>ติดตามความคืบหน้า (Pharmacist Path)</h2><span class="stage-stamp">BC -> TORONTO</span></div>' +
+    
+    '<div class="counter-box">' +
+      '<div>📅 <b>วันที่เริ่มต้นกระบวนการทั้งหมด (Day 1):</b> <input type="date" id="start-date-input" value="' + esc(state.startDate || state.date) + '" style="width:140px;display:inline-block;margin-left:8px;"></div>' +
+      '<div>⏳ ดำเนินการมาแล้ว: <b style="color:var(--accent);font-size:16px;">' + totalElapsedDays + '</b> วัน</div>' +
+    '</div>' +
+
     '<div class="row">' +
       '<div class="field" style="grid-column: span 2;"><label class="label">ขั้นตอนปัจจุบัน (' + (idx + 1) + '/' + PHARM_STAGES.length + ')</label><select id="stage-select">' + PHARM_STAGES.map((s, i) => opt(i, s.label, idx)).join('') + '</select></div>' +
-      '<div class="field"><label class="label">วันที่อัปเดตสถานะนี้</label><input type="date" id="date-input" value="' + esc(state.date) + '"></div>' +
+      '<div class="field"><label class="label">วันที่อัปเดตสเต็ปนี้</label><input type="date" id="date-input" value="' + esc(state.date) + '"></div>' +
     '</div>' +
     '<ol class="steps">' + dots + '</ol>' +
-    '<div class="pred"><div><b>คำแนะนำขั้นตอนปัจจุบัน:</b> ' + esc(curStage.hint || '-') + '</div></div>' +
     '<button class="btn primary small" id="btn-complete">✅ ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและบันทึก)</button>' +
     '<div class="field"><label class="label">บันทึกเพิ่มเติม</label><textarea id="note-input">' + esc(state.note) + '</textarea></div>' +
     '<h3>ไทม์ไลน์ความคืบหน้าที่ทำสำเร็จแล้ว (แก้ไขวันที่/ลบได้)</h3>' +
@@ -230,6 +241,11 @@ document.addEventListener('change', (e) => {
   else if (el.id === 'date-input') {
     state.date = el.value;
     if (state.history.length) state.history[state.history.length - 1].date = state.date;
+    writeState(state);
+    render();
+  }
+  else if (el.id === 'start-date-input') {
+    state.startDate = el.value;
     writeState(state);
     render();
   }
