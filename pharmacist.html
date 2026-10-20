@@ -21,12 +21,13 @@ h3 { font-size: 15px; font-weight: 600; }
 .label { font-size: 12px; letter-spacing: .04em; color: var(--muted); font-weight: 500; }
 
 header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
-.nav-switch { display: flex; gap: 8px; }
-.nav-link {
-  font-weight: 600; text-decoration: none; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--line);
-  background: var(--surface); color: var(--ink); font-size: 14px;
+.nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.nav-tab {
+  font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); padding: 8px 16px; border-radius: 6px; min-height: 40px; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
 }
-.nav-link.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.nav-tab.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
 .notice { background: #E0F2FE; color: #0369A1; border-radius: 6px; padding: 10px 14px; font-size: 13px; border: 1px solid #BAE6FD; }
 .grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 16px; align-items: start; }
@@ -75,10 +76,10 @@ textarea { min-height: 64px; resize: vertical; }
       <h1>Canadian Pharmacist Licensing Tracker</h1>
       <p class="sub">ติดตามขั้นตอนการขอใบอนุญาตประกอบวิชาชีพเภสัชกรในแคนาดา (BC -> Toronto Path)</p>
     </div>
-    <nav class="nav-switch">
-      <a href="index.html" class="nav-link">🇨🇦 IRCC PR Tracker</a>
-      <a href="pharmacist.html" class="nav-link active">💊 Pharmacist Licensing</a>
-    </nav>
+    <div class="nav-tabs">
+      <a href="index.html" class="nav-tab">PR Tracker</a>
+      <a href="pharmacist.html" class="nav-tab active">Pharmacist Tracker</a>
+    </div>
   </header>
 
   <div class="notice">
@@ -157,7 +158,6 @@ function render() {
 
   const dots = PHARM_STAGES.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '" title="' + esc(s.label) + '"></li>').join('');
 
-  // กรองและเรียงประวัติ
   const seen = new Set();
   const sortedHist = [...(state.history || [])].sort((a, b) => a.stage - b.stage);
   const historyItems = [];
@@ -178,7 +178,6 @@ function render() {
       '</div></div>';
   }).join('');
 
-  // คำนวณ Predict Timeline
   let remainingHtml = '';
   let accumMin = 0;
   let accumMax = 0;
