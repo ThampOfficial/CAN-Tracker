@@ -21,13 +21,14 @@ h3 { font-size: 15px; font-weight: 600; }
 .label { font-size: 12px; letter-spacing: .04em; color: var(--muted); font-weight: 500; }
 
 header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
-.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-.tab {
+.nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.nav-tab {
   font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--surface);
-  color: var(--ink); padding: 8px 16px; border-radius: 6px; min-height: 40px;
+  color: var(--ink); padding: 8px 16px; border-radius: 6px; min-height: 40px; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
 }
-.tab[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.tab .mono { margin-left: 8px; font-weight: 500; opacity: .85; }
+.nav-tab.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.nav-tab .mono { margin-left: 8px; font-weight: 500; opacity: .85; }
 
 .notice { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
 .notice b { font-weight: 600; }
@@ -386,7 +387,7 @@ function newProfile(name, over) {
   }, over || {});
 }
 function defaultState() {
-  const a = newProfile('โปรไฟล์ 1', { tracks: [newTrack('ee', 12, 0)] });
+  const a = newProfile('Tama', { tracks: [newTrack('ee', 12, 0)] });
   const b = newProfile('โปรไฟล์ 2', { age: 32, edu: 6, l1: [8, 8, 8, 8], cwe: 2, tracks: [Object.assign(newTrack('bc', 30, 2), { stream: 'si' })] });
   return { v: 1, example: true, active: 0, profiles: [a, b] };
 }
@@ -490,7 +491,6 @@ function trackHtml(t) {
   const streamField = prog.streams ? '<div class="field"><label class="label">สตรีม</label><select data-t="' + t.id + '" data-tf="stream">' + Object.keys(prog.streams).map(k => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>' : '';
   const sirs = t.program === 'bc' ? '<div class="field"><label class="label">SIRS</label><input type="number" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>' : '';
   
-  // กรองประวัติไม่ให้ซ้ำซ้อน และเรียงตามลำดับสเต็ปจากน้อยไปมากเสมอ
   const uniqueHistory = [];
   const seenStages = new Set();
   const sortedHist = [...(t.history || [])].sort((a, b) => a.stage - b.stage);
@@ -503,7 +503,6 @@ function trackHtml(t) {
   });
   t.history = uniqueHistory;
 
-  // สร้าง Timeline รายการที่สำเร็จแล้ว
   const timelineItems = uniqueHistory.map(h => {
     const stageObj = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
     const stageName = stageObj ? stageObj.label : 'ขั้นที่ ' + h.stage;
@@ -514,7 +513,6 @@ function trackHtml(t) {
       '</div></div>';
   }).join('');
 
-  // คำนวณวันที่สะสมล่วงหน้าสำหรับ Predict Timeline ของขั้นตอนที่เหลือ
   let remainingList = '';
   let accumMin = 0;
   let accumMax = 0;
@@ -522,7 +520,574 @@ function trackHtml(t) {
 
   for (let i = idx + 1; i < prog.stages.length; i++) {
     const stObj = prog.stages[i];
-    const w = winOf(stObj, t) || [14, 30]; // ดึงระยะเวลาขั้นต่ำและสูงสุดของสเต็ปนั้นๆ
+    const w = winOf(stObj, t) || [14, 30];
+    
+    accumMin += w[0];
+    accumMax += w[1];
+    
+    const predFrom = addDays(baseDate, accumMin);
+    const predTo = addDays(baseDate, accumMax);
+    const dateStr = fmtSpan(predFrom, predTo);
+    
+    remainingList += '<div class="timeline-item" style="opacity: 0.9; border-left: 3px solid var(--accent);">' +
+      '<span>⏳ <b>' + (i + 1) + '. ' + esc(stObj.label) + '</b></span>' +
+      '<span class="mono" style="font-size:12px;background:var(--surface);padding:3px 8px;border-radius:4px;border:1px solid var(--line);color:var(--accent);font-weight:600;">คาดว่า: ' + dateStr + '</span>' +
+      '</div>';
+  }
+
+  return '<section class="card">' +
+    '<div class="card-head"><div><span class="stage-stamp">' + esc(prog.name) + '</span></div><button class="btn ghost small" data-act="del-track" data-t="' + t.id + '">ลบโปรแกรมนี้</button></div>' +
+    '<div class="row"><div class="field"><label class="label">โปรแกรม</label><select data-t="' + t.id + '" data-tf="program">' + Object.keys(PROGRAMS).map(k => opt(k, PROGRAMS[k].name, t.program)).join('') + '</select></div>' + streamField + '</div>' +
+    '<div class="row"><div class="field"><label class="label">ขั้นตอนปัจจุบัน (' + (idx + 1) + '/' + prog.stages.length + ')</label><select data-t="' + t.id + '" data-tf="stage">' + prog.stages.map((s, i) => opt(i, (i + 1) + '. ' + s.label, idx)).join('') + '</select></div>' +
+    '<div class="field"><label class="label">วันที่อัปเดตสถานะนี้</label><input type="date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' + sirs + '</div>' +
+    '<ol class="steps">' + dots + '</ol>' +
+    '<div class="pred" id="pred-' + t.id + '">' + predHtml(t) + '</div>' +
+    '<button class="btn primary small" data-act="complete-stage" data-t="' + t.id + '">✅ ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและบันทึก)</button>' +
+    '<div class="field"><label class="label">บันทึกเพิ่มเติม</label><textarea data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
+    
+    '<h3>ไทม์ไลน์ความคืบหน้าที่ทำสำเร็จแล้ว (แก้ไขวันที่/ลบได้)</h3>' +
+    '<div class="timeline-box">' + (timelineItems || '<div class="sub">ยังไม่มีประวัติการทำสำเร็จ</div>') + '</div>' +
+
+    '<h3>Predict Timeline (ขั้นตอนที่เหลือ พร้อมวันที่คาดการณ์)</h3>' +
+    '<div class="timeline-box" style="border-left-color: var(--accent);">' + (remainingList || '<div class="sub">ถึงขั้นตอนสุดท้ายแล้ว</div>') + '</div>' +
+    '</section>';
+}
+
+function trackListHtml() {
+  const p = cur();
+  return (p.tracks.map(trackHtml).join('') || '<div class="card"><div class="empty">ยังไม่มีรายการติดตาม</div></div>') +
+    '<button class="btn primary" data-act="add-track">+ เพิ่มรายการติดตาม</button>';
+}
+
+function refHtml() {
+  const ee = EE_REF.map(r => '<tr><td>' + esc(r.cat) + '</td><td>' + r.date + '</td><td class="n">' + r.crs + '</td><td class="n">' + r.ita.toLocaleString() + '</td></tr>').join('');
+  return '<details class="card"><summary>Cutoff ล่าสุด</summary><div class="scroll-x"><table class="ref"><thead><tr><th>Category</th><th>วันที่</th><th>CRS</th><th>ITA</th></tr></thead><tbody>' + ee + '</tbody></table></div></details>';
+}
+
+const CWE_LABELS = ['น้อยกว่า 1 ปี', '1 ปี', '2 ปี', '3 ปี', '4 ปี', '5 ปีขึ้นไป'];
+const FW_LABELS = [[0, '```html
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0;font:14px system-ui,sans-serif;background:#EEF1F4;color:#14213D}</style></head><body>
+<title>IRCC Progress Tracker</title>
+<style>
+:root {
+  --bg: #EEF1F4; --surface: #FFFFFF; --surface2: #E6EBF0; --ink: #14213D;
+  --muted: #5A6678; --line: #CFD7E0; --accent: #0B6E6A; --accent-ink: #FFFFFF;
+  --warn: #8A5200; --warn-bg: #FBEFD5; --bad: #B3261E; --bad-bg: #FBE4E1; --ok: #17703F; --ok-bg: #DDF2E6;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, sans-serif; font-size: 15px; line-height: 1.55;
+  padding: 20px 16px 56px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { margin: 0; line-height: 1.2; }
+h1 { font-size: 26px; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 600; }
+h3 { font-size: 15px; font-weight: 600; }
+.sub { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+.mono { font-variant-numeric: tabular-nums; font-family: monospace; }
+.label { font-size: 12px; letter-spacing: .04em; color: var(--muted); font-weight: 500; }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+.nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.nav-tab {
+  font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); padding: 8px 16px; border-radius: 6px; min-height: 40px; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.nav-tab.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.notice { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
+.notice b { font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.check { flex-direction: row; align-items: center; gap: 8px; }
+input[type=text], input[type=number], input[type=date], select, textarea {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0;
+}
+textarea { min-height: 64px; resize: vertical; }
+input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+.clb { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.clb .field span { font-size: 11px; color: var(--muted); text-align: center; }
+.clb input { text-align: center; padding-inline: 4px; }
+
+.btn {
+  font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: 8px 14px; min-height: 40px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.ghost { border-color: transparent; color: var(--muted); }
+.btn.small { min-height: 36px; padding: 6px 12px; font-size: 13px; width: 100%; }
+
+.stage-stamp {
+  display: inline-block; font-family: monospace; font-size: 12px; letter-spacing: .03em; text-transform: uppercase;
+  border: 1.5px solid var(--accent); color: var(--accent); padding: 2px 8px; border-radius: 3px;
+}
+.pred { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.pred .big { font-size: 18px; font-weight: 600; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.neutral { background: var(--surface2); color: var(--muted); }
+
+.steps { display: flex; flex-wrap: wrap; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.steps li { flex: 1 1 0; min-width: 14px; height: 6px; border-radius: 3px; background: var(--surface2); }
+.steps li.done { background: var(--accent); }
+.steps li.now { background: var(--accent); opacity: .5; }
+
+.timeline-box { margin-top: 4px; border-left: 2px solid var(--accent); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; }
+.timeline-item { font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2); padding: 8px 10px; border-radius: 4px; gap: 8px; flex-wrap: wrap; }
+.timeline-item input[type=date] { width: 130px; min-height: 32px; font-size: 12px; padding: 2px 6px; }
+
+.score-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.score-num { font-family: monospace; font-size: 52px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+table.break { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.break td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+table.break td:last-child { text-align: right; font-family: monospace; font-variant-numeric: tabular-nums; }
+table.break tr:last-child td { border-bottom: 0; }
+.scroll-x { overflow-x: auto; }
+table.ref { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
+table.ref th, table.ref td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.ref th { color: var(--muted); font-weight: 500; font-size: 12px; }
+table.ref td.n { font-family: monospace; font-variant-numeric: tabular-nums; text-align: right; }
+
+details > summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.foot { color: var(--muted); font-size: 12px; }
+.savestate { font-size: 12px; color: var(--muted); }
+</style>
+<div id="app" class="wrap"><p class="sub">กำลังโหลด…</p></div>
+<script>
+const AGE_SINGLE = { 18: 99, 19: 105, 30: 105, 31: 99, 32: 94, 33: 88, 34: 83, 35: 77, 36: 72, 37: 66, 38: 61, 39: 55, 40: 50, 41: 39, 42: 28, 43: 17, 44: 6 };
+const AGE_SPOUSE = { 18: 90, 19: 95, 30: 95, 31: 90, 32: 85, 33: 80, 34: 75, 35: 70, 36: 65, 37: 60, 38: 55, 39: 50, 40: 45, 41: 35, 42: 25, 43: 15, 44: 5 };
+const EDU_SINGLE = [0, 30, 90, 98, 120, 128, 135, 150];
+const EDU_SPOUSE = [0, 28, 84, 91, 112, 119, 126, 140];
+const EDU_LABELS = [
+  'ต่ำกว่ามัธยม', 'มัธยมปลาย', 'อนุปริญญา/หลักสูตร 1 ปี', 'หลักสูตร 2 ปี',
+  'ปริญญาตรี (หรือ 3 ปีขึ้นไป)', 'วุฒิ 2 ใบขึ้นไป (ใบหนึ่ง 3 ปีขึ้นไป)', 'ปริญญาโท / วิชาชีพที่ต้องมีใบอนุญาต', 'ปริญญาเอก'
+];
+const L1_SINGLE = { 4: 6, 5: 6, 6: 9, 7: 17, 8: 23, 9: 31, 10: 34 };
+const L1_SPOUSE = { 4: 6, 5: 6, 6: 8, 7: 16, 8: 22, 9: 29, 10: 32 };
+const CWE_SINGLE = [0, 40, 53, 64, 72, 80];
+const CWE_SPOUSE = [0, 35, 46, 56, 63, 70];
+const SP_EDU = [0, 2, 6, 7, 8, 9, 10, 10];
+const SP_CWE = [0, 5, 7, 8, 9, 10];
+
+const NOC_CATEGORIES = [
+  { val: 'none', label: 'ทั่วไป (General / ไม่ตรง Category)' },
+  { val: 'healthcare', label: 'Healthcare & Social Services (สาธารณสุข)' },
+  { val: 'stem', label: 'STEM Occupations (วิทยาศาสตร์ เทคโนโลยี วิศวะ)' },
+  { val: 'trades', label: 'Trade Occupations (ช่างฝีมือ/งานเฉพาะทาง)' },
+  { val: 'transport', label: 'Transport Occupations (ขนส่ง)' },
+  { val: 'agriculture', label: 'Agriculture & Agri-food (การเกษตร)' },
+  { val: 'french', label: 'French-language proficiency (เน้นภาษาฝรั่งเศส)' }
+];
+
+const HIGH_WAGE_EXP_OPTIONS = [
+  { val: 0, label: 'ไม่มี / ต่ำกว่าเกณฑ์ High-wage (+0)' },
+  { val: 20, label: 'ระดับ High-wage Tier 1 (1.3x Median) (+20)' },
+  { val: 40, label: 'ระดับ High-wage Tier 2 (1.5x Median) (+40)' },
+  { val: 70, label: 'ระดับ High-wage Tier 3 (2.0x Median) (+70)' }
+];
+
+const HIGH_WAGE_JOB_OPTIONS = [
+  { val: 0, label: 'ไม่มีข้อเสนองานรายได้สูง (+0)' },
+  { val: 50, label: 'มี Job Offer High-wage Tier 1 (+50)' },
+  { val: 70, label: 'มี Job Offer High-wage Tier 2 (+70)' },
+  { val: 100, label: 'มี Job Offer High-wage Tier 3 (+100)' }
+];
+
+const EE_STAGES = [
+  { label: 'เตรียมเอกสารตั้งต้น', win: [14, 30] },
+  { label: 'สร้างโปรไฟล์ EE (อยู่ใน Pool)', win: [14, 30], mode: 'ee-pool' },
+  { label: 'ได้รับ ITA แล้ว', win: [14, 60], deadline: 60, hint: 'ต้องยื่น PR ภายใน 60 วันหลังได้ ITA' },
+  { label: 'ตรวจสุขภาพ (Upfront Medical)', win: [7, 30] },
+  { label: 'ขอใบรับรองความประพฤติ (PCC)', win: [14, 45] },
+  { label: 'รวบรวมเอกสารการทำงานและสลิป', win: [7, 30] },
+  { label: 'ส่งใบสมัคร e-APR (รอรับ AOR)', win: [1, 14] },
+  { label: 'เก็บข้อมูลชีวมิติ (Biometrics)', win: [14, 30] },
+  { label: 'ตรวจสอบคุณสมบัติ (Eligibility)', win: [60, 150] },
+  { label: 'ตรวจสอบประวัติ (Background Check)', win: [60, 150] },
+  { label: 'ได้รับอีเมลเชิญเข้า PR Portal (PPR)', win: [14, 45] },
+  { label: 'ตอบกลับ Portal ขั้นตอนที่ 1 (P1)', win: [1, 7] },
+  { label: 'อัปโหลดรูปและที่อยู่ (P2)', win: [3, 14] },
+  { label: 'ได้รับ eCOPR', win: [7, 21] },
+  { label: 'ได้รับบัตร PR Card ตัวจริง', win: [30, 90], final: true }
+];
+
+const PROGRAMS = {
+  ee: { name: 'Express Entry (Granular Track)', stages: EE_STAGES },
+  bc: { name: 'BC PNP', stages: [
+    { label: 'ลงทะเบียน SIRS รอ invitation', win: [14, 30], mode: 'bc-pool' },
+    { label: 'ได้รับ invitation แล้ว', win: [7, 25], deadline: 25 },
+    { label: 'ยื่นใบสมัคร BC PNP', win: [60, 90] },
+    { label: 'ได้ nomination', win: [14, 60] },
+    { label: 'ยื่น PR ที่ IRCC', win: [150, 210] },
+    { label: 'ได้ COPR / เป็น PR แล้ว', win: [30, 90], final: true }
+  ]},
+  oinp: { name: 'OINP (Ontario)', stages: [
+    { label: 'เตรียมเอกสาร', win: [14, 30], mode: 'oinp-prep' },
+    { label: 'ยื่นใบสมัคร OINP', win: [30, 90] },
+    { label: 'ได้ nomination', win: [14, 60], deadline: 180 },
+    { label: 'ยื่น PR ที่ IRCC', win: [180, 240] },
+    { label: 'ได้ COPR / เป็น PR แล้ว', win: [30, 90], final: true }
+  ]}
+};
+const DEFAULT_STREAM = { ee: '', bc: 'si', oinp: 'hc' };
+
+const EE_REF = [
+  { cat: 'Provincial Nominee Program', date: '2026-09-28', crs: 725, ita: 733 },
+  { cat: 'Canadian Experience Class', date: '2026-09-29', crs: 518, ita: 2000 },
+  { cat: 'Trades occupations', date: '2026-10-01', crs: 476, ita: 3500 },
+  { cat: 'Healthcare & social services', date: '2026-09-04', crs: 475, ita: 3500 },
+];
+const EE_CLUSTER_ANCHOR = '2026-09-28';
+const EE_CLUSTER_GAP = 14;
+
+const DAY = 86400000;
+function parseD(s) { if(!s) return todayD(); const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
+function fmtISO(d) { const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function todayD() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+function diffDays(a, b) { return Math.round((a - b) / DAY); }
+function fmtTH(d) { return d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function fmtSpan(a, b) {
+  const y = a.getFullYear() === b.getFullYear();
+  const f = (d, withY) => d.toLocaleDateString('th-TH-u-ca-gregory', withY ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
+  return f(a, !y) + ' – ' + f(b, true);
+}
+function dur(days) {
+  if (days < 45) return days + ' วัน';
+  const m = days / 30.4;
+  return (Math.round(m * 2) / 2) + ' เดือน';
+}
+function winOf(stage, t) { return typeof stage.win === 'function' ? stage.win(t) : stage.win; }
+
+function calcAgeOnDate(dobStr, targetDateStr) {
+  if (!dobStr) return null;
+  const dob = new Date(dobStr);
+  const target = targetDateStr ? new Date(targetDateStr) : new Date();
+  if (isNaN(dob.getTime()) || isNaN(target.getTime())) return null;
+  let age = target.getFullYear() - dob.getFullYear();
+  const m = target.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && target.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+function calcCweOnDate(startDateStr, targetDateStr) {
+  if (!startDateStr) return null;
+  const start = new Date(startDateStr);
+  const target = targetDateStr ? new Date(targetDateStr) : new Date();
+  if (isNaN(start.getTime()) || isNaN(target.getTime())) return null;
+  const diffTime = target - start;
+  if (diffTime < 0) return 0;
+  const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+  if (diffYears < 1) return 0;
+  if (diffYears < 2) return 1;
+  if (diffYears < 3) return 2;
+  if (diffYears < 4) return 3;
+  if (diffYears < 5) return 4;
+  return 5;
+}
+
+function agePts(age, spouse) {
+  age = Math.floor(num(age));
+  if (age < 18 || age >= 45) return 0;
+  if (age >= 20 && age <= 29) return spouse ? 100 : 110;
+  return (spouse ? AGE_SPOUSE : AGE_SINGLE)[age] || 0;
+}
+function l1Pts(clb, spouse) {
+  const c = lvl(clb);
+  if (c < 4) return 0;
+  return (spouse ? L1_SPOUSE : L1_SINGLE)[c];
+}
+function l2Pts(clb) {
+  const c = lvl(clb);
+  if (c >= 9) return 6;
+  if (c >= 7) return 3;
+  if (c >= 5) return 1;
+  return 0;
+}
+function eduTier(i) { return i >= 5 ? 2 : i >= 2 ? 1 : 0; }
+
+function computeCRS(p) {
+  const sp = !!p.spouse;
+  const evalDate = p.targetEvalDate || fmtISO(todayD());
+  
+  let effectiveAge = p.age;
+  if (p.dob) {
+    const calcA = calcAgeOnDate(p.dob, evalDate);
+    if (calcA !== null) effectiveAge = calcA;
+  }
+  
+  let effectiveCwe = p.cwe;
+  if (p.caStartDate) {
+    const calcC = calcCweOnDate(p.caStartDate, evalDate);
+    if (calcC !== null) effectiveCwe = calcC;
+  }
+
+  const age = agePts(effectiveAge, sp);
+  const edu = (sp ? EDU_SPOUSE : EDU_SINGLE)[clamp(num(p.edu), 0, 7)];
+  const first = p.l1.reduce((s, v) => s + l1Pts(v, sp), 0);
+  const second = Math.min(sp ? 22 : 24, p.l2.reduce((s, v) => s + l2Pts(v), 0));
+  const cwe = (sp ? CWE_SPOUSE : CWE_SINGLE)[clamp(num(effectiveCwe), 0, 5)];
+  const core = age + edu + first + second + cwe;
+
+  let spouse = 0;
+  if (sp) {
+    spouse = SP_EDU[clamp(num(p.spEdu), 0, 7)] + p.spL.reduce((s, v) => s + (lvl(v) >= 9 ? 5 : lvl(v) >= 7 ? 3 : lvl(v) >= 5 ? 1 : 0), 0) + SP_CWE[clamp(num(p.spCwe), 0, 5)];
+    spouse = Math.min(40, spouse);
+  }
+
+  const m1 = minOf(p.l1);
+  const langTier = m1 >= 9 ? 2 : m1 >= 7 ? 1 : 0;
+  const cweTier = num(effectiveCwe) >= 2 ? 2 : num(effectiveCwe) >= 1 ? 1 : 0;
+  const et = eduTier(num(p.edu));
+  const eduPair = (a, b) => (a === 0 || b === 0) ? 0 : (et === 2 ? (b === 2 ? 50 : 25) : (b === 2 ? 25 : 13));
+  const eduLang = et === 0 ? 0 : eduPair(et, langTier);
+  const eduCwe = et === 0 ? 0 : eduPair(et, cweTier);
+  const fw = num(p.fw);
+  const fwTier = fw >= 3 ? 2 : fw >= 1 ? 1 : 0;
+  const fwPair = (b) => fwTier === 0 || b === 0 ? 0 : (fwTier === 2 ? (b === 2 ? 50 : 25) : (b === 2 ? 25 : 13));
+  const fwLang = fwPair(langTier);
+  const fwCwe = fwPair(cweTier);
+  const cert = p.cert ? (m1 >= 7 ? 50 : m1 >= 5 ? 25 : 0) : 0;
+  const transferParts = {
+    eduLang, eduCwe, fwLang, fwCwe, cert,
+    eduSub: Math.min(50, eduLang + eduCwe),
+    fwSub: Math.min(50, fwLang + fwCwe),
+  };
+  const transfer = Math.min(100, transferParts.eduSub + transferParts.fwSub + cert);
+
+  const frArr = p.lang1 === 'fr' ? p.l1 : p.l2;
+  const enArr = p.lang1 === 'fr' ? p.l2 : p.l1;
+  let french = 0;
+  if (minOf(frArr) >= 7) french = minOf(enArr) >= 5 ? 50 : 25;
+  const study = [0, 15, 30][clamp(num(p.study), 0, 2)];
+  const sibling = p.sibling ? 15 : 0;
+  const pnp = p.pnp ? 600 : 0;
+  
+  const selectedHighWageBonus = Math.max(num(p.highWageExp || 0), num(p.highWageJob || 0));
+  const additional = Math.min(600, french + study + sibling + pnp + selectedHighWageBonus);
+
+  return {
+    age, edu, first, second, cwe, core, spouse, transfer, transferParts,
+    french, study, sibling, pnp, selectedHighWageBonus, additional,
+    effectiveAge, effectiveCwe, evalDate,
+    total: core + spouse + transfer + additional,
+  };
+}
+
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const minOf = (arr) => Math.min(...arr.map((v) => clamp(Math.round(num(v)), 0, 10)));
+const lvl = (v) => clamp(Math.round(num(v)), 0, 10);
+
+function predict(t, crsTotal) {
+  const prog = PROGRAMS[t.program];
+  const idx = Math.min(Math.max(t.stage, 0), prog.stages.length - 1);
+  const st = prog.stages[idx];
+  const today = todayD();
+  const since = parseD(t.date);
+  const elapsed = diffDays(today, since);
+  const out = { idx, st, elapsed, since, total: prog.stages.length, final: !!st.final };
+  if (st.final) return out;
+
+  if (st.deadline) {
+    const dl = addDays(since, st.deadline);
+    out.deadline = { date: dl, left: diffDays(dl, today) };
+  }
+
+  const w = winOf(st, t);
+  if (w) {
+    out.from = addDays(since, w[0]);
+    out.to = addDays(since, w[1]);
+    out.window = w;
+    out.pct = Math.min(100, Math.max(0, Math.round((elapsed / w[1]) * 100)));
+    out.state = today < out.from ? 'early' : today <= out.to ? 'in' : 'late';
+  } else {
+    out.mode = st.mode;
+  }
+
+  let lo = 0, hi = 0, seenNull = false;
+  for (let i = idx; i < prog.stages.length - 1; i++) {
+    const ww = winOf(prog.stages[i], t);
+    if (!ww) { if (i === idx) seenNull = true; continue; }
+    if (i === idx) { lo += Math.max(0, ww[0] - elapsed); hi += Math.max(0, ww[1] - elapsed); }
+    else { lo += ww[0]; hi += ww[1]; }
+  }
+  out.finish = { from: addDays(today, lo), to: addDays(today, hi), skipped: seenNull };
+  out.restLo = lo;
+  out.restHi = hi;
+
+  if (st.mode === 'ee-pool') {
+    const anchor = parseD(EE_CLUSTER_ANCHOR);
+    let next = anchor;
+    while (next < today) next = addDays(next, EE_CLUSTER_GAP);
+    out.nextDraw = next;
+    out.score = crsTotal;
+  }
+  return out;
+}
+
+const STORE_KEY = 'ircc-tracker-v1';
+const uid = () => 't' + Math.random().toString(36).slice(2, 9);
+
+function newTrack(program, daysAgo, stage) {
+  const d = addDays(todayD(), -(daysAgo || 0));
+  return { id: uid(), program, stream: DEFAULT_STREAM[program], stage: stage || 0, date: fmtISO(d), sirs: '', note: '', history: [{ date: fmtISO(d), stage: stage || 0 }] };
+}
+function newProfile(name, over) {
+  return Object.assign({
+    name, spouse: false, dob: '', targetEvalDate: fmtISO(todayD()), age: 30, caStartDate: '', edu: 4, nocCat: 'none', 
+    highWageExp: 0, highWageJob: 0, lang1: 'en', l1: [9, 9, 9, 9], l2: [0, 0, 0, 0],
+    cwe: 1, fw: 0, cert: false, study: 0, sibling: false, pnp: false,
+    spEdu: 0, spL: [0, 0, 0, 0], spCwe: 0, tracks: [],
+  }, over || {});
+}
+function defaultState() {
+  const a = newProfile('Tama', { tracks: [newTrack('ee', 12, 0)] });
+  const b = newProfile('โปรไฟล์ 2', { age: 32, edu: 6, l1: [8, 8, 8, 8], cwe: 2, tracks: [Object.assign(newTrack('bc', 30, 2), { stream: 'si' })] });
+  return { v: 1, example: true, active: 0, profiles: [a, b] };
+}
+function normalize(s) {
+  const base = defaultState();
+  if (!s || !Array.isArray(s.profiles) || s.profiles.length < 2) return base;
+  s.profiles = s.profiles.slice(0, 2).map((p, i) => {
+    const q = Object.assign(newProfile('โปรไฟล์ ' + (i + 1)), p);
+    if (!q.targetEvalDate) q.targetEvalDate = fmtISO(todayD());
+    ['l1', 'l2', 'spL'].forEach((k) => { if (!Array.isArray(q[k]) || q[k].length !== 4) q[k] = [0, 0, 0, 0]; });
+    q.tracks = (Array.isArray(p.tracks) ? p.tracks : []).filter((t) => t && PROGRAMS[t.program]).map((t) => {
+      const base2 = newTrack(t.program);
+      const m = Object.assign(base2, t);
+      if (!Array.isArray(m.history)) m.history = [];
+      return m;
+    });
+    return q;
+  });
+  s.active = s.active === 1 ? 1 : 0;
+  s.v = 1;
+  return s;
+}
+
+let state = null;
+let touched = false;
+let saveTimer = null;
+
+function readLocal() {
+  try { const raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+function writeLocal() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+function setSaveNote(t) {
+  const el = document.getElementById('savestate');
+  if (el) el.textContent = t;
+}
+function scheduleSave() {
+  touched = true;
+  state.example = false;
+  writeLocal();
+  setSaveNote('บันทึกในเบราว์เซอร์แล้ว');
+  clearTimeout(saveTimer);
+}
+
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cur = () => state.profiles[state.active];
+const opt = (v, label, sel) => '<option value="' + esc(v) + '"' + (String(sel) === String(v) ? ' selected' : '') + '>' + esc(label) + '</option>';
+
+function deadlinePill(p) {
+  if (!p.deadline) return '';
+  const { left, date } = p.deadline;
+  if (left < 0) return '<span class="pill bad">เลยกำหนดมา ' + (-left) + ' วัน (' + fmtTH(date) + ')</span>';
+  if (left <= 14) return '<span class="pill warn">ใกล้ครบกำหนด เหลือ ' + left + ' วัน (' + fmtTH(date) + ')</span>';
+  return '<span class="pill ok">กำหนดส่ง ' + fmtTH(date) + ' (เหลือ ' + left + ' วัน)</span>';
+}
+
+function eePoolHtml(p, t) {
+  const s = p.score;
+  const cec = EE_REF[1].crs;
+  let verdict = s >= cec ? '<span class="pill ok">คะแนนสูงกว่า cutoff CEC ล่าสุด (' + cec + ') มีโอกาสสูง</span>' : '<span class="pill bad">คะแนนต่ำกว่า CEC cutoff ล่าสุด (' + cec + ')</span>';
+  return '<div class="big">รอบ draw ถัดไปคาดว่า ~' + fmtTH(p.nextDraw) + '</div>' +
+    '<div>' + verdict + '</div>' +
+    '<div class="sub">หลังได้ ITA ปกติใช้เวลาอีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
+}
+
+function bcPoolHtml(p, t) {
+  const v = t.sirs === '' ? null : Number(t.sirs);
+  let verdict = v == null ? '<span class="pill neutral">ใส่คะแนน SIRS</span>' : v >= 95 ? '<span class="pill ok">SIRS อยู่ในเกณฑ์ดีเยี่ยม</span>' : '<span class="pill warn">SIRS ต่ำกว่า cutoff เฉลี่ยเล็กน้อย</span>';
+  return '<div class="big">invitation รอบถัดไปใน 2 สัปดาห์</div><div>' + verdict + '</div>';
+}
+
+function oinpPrepHtml(p, t) {
+  return '<div class="big">เตรียมความพร้อม OINP</div><div class="sub">เมื่อยื่นแล้วเปลี่ยนสถานะเพื่อติดตามเวลา</div>';
+}
+
+function predHtml(t) {
+  const p = predict(t, computeCRS(cur()).total);
+  const prog = PROGRAMS[t.program];
+  if (p.final) return '<span class="pill ok">เสร็จสิ้นสมบูรณ์แล้ว</span>';
+  const next = prog.stages[p.idx + 1];
+  let body = '';
+  if (p.mode === 'ee-pool') body = eePoolHtml(p, t);
+  else if (p.mode === 'bc-pool') body = bcPoolHtml(p, t);
+  else if (p.mode === 'oinp-prep') body = oinpPrepHtml(p, t);
+  else {
+    const label = p.state === 'early' ? '<span class="pill neutral">ยังไม่ถึงช่วงปกติ</span>' : p.state === 'in' ? '<span class="pill ok">อยู่ในช่วงเวลาปกติ</span>' : '<span class="pill bad">เกินช่วงปกติเล็กน้อย</span>';
+    body = '<div class="big">ขั้นถัดไปคาดว่า ' + fmtSpan(p.from, p.to) + '</div>' +
+      '<div>' + label + '</div>' +
+      '<div class="sub">ผ่านมา ' + p.elapsed + ' วันจากช่วงปกติ (' + dur(p.window[0]) + ' – ' + dur(p.window[1]) + ') ' + (next ? '| ถัดไป: ' + esc(next.label) : '') + '</div>' +
+      '<div class="sub">คาดการณ์สิ้นสุดกระบวนการ <span class="mono">' + fmtSpan(p.finish.from, p.finish.to) + '</span></div>';
+  }
+  const dl = deadlinePill(p);
+  return body + (dl ? '<div>' + dl + '</div>' : '') + (p.st.hint ? '<div class="sub">' + esc(p.st.hint) + '</div>' : '');
+}
+
+function trackHtml(t) {
+  const prog = PROGRAMS[t.program];
+  const idx = Math.min(t.stage, prog.stages.length - 1);
+  const dots = prog.stages.map((s, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '" title="' + esc(s.label) + '"></li>').join('');
+  const streamField = prog.streams ? '<div class="field"><label class="label">สตรีม</label><select data-t="' + t.id + '" data-tf="stream">' + Object.keys(prog.streams).map(k => opt(k, prog.streams[k], t.stream)).join('') + '</select></div>' : '';
+  const sirs = t.program === 'bc' ? '<div class="field"><label class="label">SIRS</label><input type="number" data-t="' + t.id + '" data-tf="sirs" value="' + esc(t.sirs) + '"></div>' : '';
+  
+  const uniqueHistory = [];
+  const seenStages = new Set();
+  const sortedHist = [...(t.history || [])].sort((a, b) => a.stage - b.stage);
+  
+  sortedHist.forEach(h => {
+    if (!seenStages.has(h.stage)) {
+      seenStages.add(h.stage);
+      uniqueHistory.push(h);
+    }
+  });
+  t.history = uniqueHistory;
+
+  const timelineItems = uniqueHistory.map(h => {
+    const stageObj = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
+    const stageName = stageObj ? stageObj.label : 'ขั้นที่ ' + h.stage;
+    return '<div class="timeline-item"><span>✅ <b>' + esc(stageName) + '</b></span>' +
+      '<div style="display:flex;gap:6px;align-items:center;">' +
+      '<input type="date" data-act="edit-history-date" data-t="' + t.id + '" data-stage="' + h.stage + '" value="' + esc(h.date) + '">' +
+      '<button class="btn ghost small" style="min-height:32px;width:32px;padding:0;" data-act="del-history" data-t="' + t.id + '" data-stage="' + h.stage + '" title="ลบรายการนี้">🗑️</button>' +
+      '</div></div>';
+  }).join('');
+
+  let remainingList = '';
+  let accumMin = 0;
+  let accumMax = 0;
+  const baseDate = parseD(t.date || fmtISO(todayD()));
+
+  for (let i = idx + 1; i < prog.stages.length; i++) {
+    const stObj = prog.stages[i];
+    const w = winOf(stObj, t) || [14, 30];
     
     accumMin += w[0];
     accumMax += w[1];
@@ -641,14 +1206,13 @@ function scoreBoxHtml() {
     '<div>' + chip + '</div><table class="break"><tbody>' + breakdownRows(c, p) + '</tbody></table>';
 }
 
-function tabsHtml() {
-  return state.profiles.map((p, i) => '<button class="tab" data-act="tab" data-i="' + i + '" aria-pressed="' + (i === state.active) + '">' + esc(p.name) + '<span class="mono">' + computeCRS(p).total + '</span></button>').join('');
-}
-
 function render() {
   document.getElementById('app').innerHTML =
     '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
-    '<div class="tabs">' + tabsHtml() + '</div></header>' +
+    '<div class="nav-tabs">' +
+      '<a href="index.html" class="nav-tab active">PR Tracker</a>' +
+      '<a href="pharmacist.html" class="nav-tab">Pharmacist Tracker</a>' +
+    '</div></header>' +
     '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> แสดงวันที่คาดการณ์ใน Predict Timeline ล่วงหน้าเรียบร้อยแล้ว</div>' +
     '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
     '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
@@ -658,7 +1222,6 @@ function render() {
 function refreshLive() {
   const sb = document.getElementById('scorebox');
   if (sb) sb.innerHTML = scoreBoxHtml();
-  state.profiles.forEach((p, i) => { const el = document.getElementById('tabscore-' + i); if (el) el.textContent = computeCRS(p).total; });
   cur().tracks.forEach((t) => { const el = document.getElementById('pred-' + t.id); if (el) el.innerHTML = predHtml(t); });
 }
 
@@ -723,8 +1286,7 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const act = b.dataset.act;
-  if (act === 'tab') { state.active = Number(b.dataset.i); scheduleSave(); render(); }
-  else if (act === 'add-track') { cur().tracks.push(newTrack('ee', 0, 0)); scheduleSave(); render(); }
+  if (act === 'add-track') { cur().tracks.push(newTrack('ee', 0, 0)); scheduleSave(); render(); }
   else if (act === 'del-track') { cur().tracks = cur().tracks.filter(t => t.id !== b.dataset.t); scheduleSave(); render(); }
   else if (act === 'del-history') {
     const t = cur().tracks.find(x => x.id === b.dataset.t);
