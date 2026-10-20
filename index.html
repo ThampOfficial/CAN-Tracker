@@ -95,7 +95,7 @@ table.break tr:last-child td { border-bottom: 0; }
 .foot { color: var(--muted); font-size: 12px; }
 .savestate { font-size: 12px; color: var(--muted); }
 </style>
-<div id="app" class="wrap"><p class="sub">กำลังโหลด…</p></div>
+<div id="app" class="wrap"><p class="sub">กำลังโหลด...</p></div>
 <script>
 const AGE_SINGLE = { 18: 99, 19: 105, 30: 105, 31: 99, 32: 94, 33: 88, 34: 83, 35: 77, 36: 72, 37: 66, 38: 61, 39: 55, 40: 50, 41: 39, 42: 28, 43: 17, 44: 6 };
 const AGE_SPOUSE = { 18: 90, 19: 95, 30: 95, 31: 90, 32: 85, 33: 80, 34: 75, 35: 70, 36: 65, 37: 60, 38: 55, 39: 50, 40: 45, 41: 35, 42: 25, 43: 15, 44: 5 };
@@ -193,7 +193,7 @@ function fmtTH(d) { return d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'nu
 function fmtSpan(a, b) {
   const y = a.getFullYear() === b.getFullYear();
   const f = (d, withY) => d.toLocaleDateString('th-TH-u-ca-gregory', withY ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
-  return f(a, !y) + ' – ' + f(b, true);
+  return f(a, !y) + ' - ' + f(b, true);
 }
 function dur(days) {
   if (days < 45) return days + ' วัน';
@@ -411,7 +411,6 @@ function normalize(s) {
 }
 
 let state = null;
-let touched = false;
 let saveTimer = null;
 
 function readLocal() {
@@ -421,7 +420,6 @@ function writeLocal() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
 }
 function scheduleSave() {
-  touched = true;
   state.example = false;
   writeLocal();
   clearTimeout(saveTimer);
@@ -445,7 +443,7 @@ function eePoolHtml(p, t) {
   let verdict = s >= cec ? '<span class="pill ok">คะแนนสูงกว่า cutoff CEC ล่าสุด (' + cec + ') มีโอกาสสูง</span>' : '<span class="pill bad">คะแนนต่ำกว่า CEC cutoff ล่าสุด (' + cec + ')</span>';
   return '<div class="big">รอบ draw ถัดไปคาดว่า ~' + fmtTH(p.nextDraw) + '</div>' +
     '<div>' + verdict + '</div>' +
-    '<div class="sub">หลังได้ ITA ปกติใช้เวลาอีกราว ' + dur(p.restLo) + ' – ' + dur(p.restHi) + ' จนถึง PR</div>';
+    '<div class="sub">หลังได้ ITA ปกติใช้เวลาอีกราว ' + dur(p.restLo) + ' - ' + dur(p.restHi) + ' จนถึง PR</div>';
 }
 
 function bcPoolHtml(p, t) {
@@ -471,7 +469,7 @@ function predHtml(t) {
     const label = p.state === 'early' ? '<span class="pill neutral">ยังไม่ถึงช่วงปกติ</span>' : p.state === 'in' ? '<span class="pill ok">อยู่ในช่วงเวลาปกติ</span>' : '<span class="pill bad">เกินช่วงปกติเล็กน้อย</span>';
     body = '<div class="big">ขั้นถัดไปคาดว่า ' + fmtSpan(p.from, p.to) + '</div>' +
       '<div>' + label + '</div>' +
-      '<div class="sub">ผ่านมา ' + p.elapsed + ' วันจากช่วงปกติ (' + dur(p.window[0]) + ' – ' + dur(p.window[1]) + ') ' + (next ? '| ถัดไป: ' + esc(next.label) : '') + '</div>' +
+      '<div class="sub">ผ่านมา ' + p.elapsed + ' วันจากช่วงปกติ (' + dur(p.window[0]) + ' - ' + dur(p.window[1]) + ') ' + (next ? '| ถัดไป: ' + esc(next.label) : '') + '</div>' +
       '<div class="sub">คาดการณ์สิ้นสุดกระบวนการ <span class="mono">' + fmtSpan(p.finish.from, p.finish.to) + '</span></div>';
   }
   const dl = deadlinePill(p);
@@ -500,10 +498,10 @@ function trackHtml(t) {
   const timelineItems = uniqueHistory.map(h => {
     const stageObj = prog.stages[Math.min(h.stage, prog.stages.length - 1)];
     const stageName = stageObj ? stageObj.label : 'ขั้นที่ ' + h.stage;
-    return '<div class="timeline-item"><span>✅ <b>' + esc(stageName) + '</b></span>' +
+    return '<div class="timeline-item"><span>Done: <b>' + esc(stageName) + '</b></span>' +
       '<div style="display:flex;gap:6px;align-items:center;">' +
       '<input type="date" data-act="edit-history-date" data-t="' + t.id + '" data-stage="' + h.stage + '" value="' + esc(h.date) + '">' +
-      '<button class="btn ghost small" style="min-height:32px;width:32px;padding:0;" data-act="del-history" data-t="' + t.id + '" data-stage="' + h.stage + '" title="ลบรายการนี้">🗑️</button>' +
+      '<button class="btn ghost small" style="min-height:32px;width:32px;padding:0;" data-act="del-history" data-t="' + t.id + '" data-stage="' + h.stage + '" title="ลบรายการนี้">Del</button>' +
       '</div></div>';
   }).join('');
 
@@ -524,7 +522,7 @@ function trackHtml(t) {
     const dateStr = fmtSpan(predFrom, predTo);
     
     remainingList += '<div class="timeline-item" style="opacity: 0.9; border-left: 3px solid var(--accent);">' +
-      '<span>⏳ <b>' + (i + 1) + '. ' + esc(stObj.label) + '</b></span>' +
+      '<span>Pending: <b>' + (i + 1) + '. ' + esc(stObj.label) + '</b></span>' +
       '<span class="mono" style="font-size:12px;background:var(--surface);padding:3px 8px;border-radius:4px;border:1px solid var(--line);color:var(--accent);font-weight:600;">คาดว่า: ' + dateStr + '</span>' +
       '</div>';
   }
@@ -536,7 +534,7 @@ function trackHtml(t) {
     '<div class="field"><label class="label">วันที่อัปเดตสถานะนี้</label><input type="date" data-t="' + t.id + '" data-tf="date" value="' + esc(t.date) + '"></div>' + sirs + '</div>' +
     '<ol class="steps">' + dots + '</ol>' +
     '<div class="pred" id="pred-' + t.id + '">' + predHtml(t) + '</div>' +
-    '<button class="btn primary small" data-act="complete-stage" data-t="' + t.id + '">✅ ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและบันทึก)</button>' +
+    '<button class="btn primary small" data-act="complete-stage" data-t="' + t.id + '">ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและบันทึก)</button>' +
     '<div class="field"><label class="label">บันทึกเพิ่มเติม</label><textarea data-t="' + t.id + '" data-tf="note">' + esc(t.note) + '</textarea></div>' +
     
     '<h3>ไทม์ไลน์ความคืบหน้าที่ทำสำเร็จแล้ว (แก้ไขวันที่/ลบได้)</h3>' +
@@ -559,8 +557,8 @@ function refHtml() {
 }
 
 const CWE_LABELS = ['น้อยกว่า 1 ปี', '1 ปี', '2 ปี', '3 ปี', '4 ปี', '5 ปีขึ้นไป'];
-const FW_LABELS = [[0, 'ไม่มี'], [1, '1–2 ปี'], [3, '3 ปีขึ้นไป']];
-const STUDY_LABELS = ['ไม่มี', 'วุฒิแคนาดา 1–2 ปี', 'วุฒิแคนาดา 3 ปีขึ้นไป'];
+const FW_LABELS = [[0, 'ไม่มี'], [1, '1-2 ปี'], [3, '3 ปีขึ้นไป']];
+const STUDY_LABELS = ['ไม่มี', 'วุฒิแคนาดา 1-2 ปี', 'วุฒิแคนาดา 3 ปีขึ้นไป'];
 const SKILLS = ['ฟัง', 'พูด', 'อ่าน', 'เขียน'];
 
 function clbRow(arr, f, ix, label) {
@@ -654,7 +652,7 @@ function render() {
         '</div>' +
       '</div>' +
       '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">' +
-        '<label class="label">📅 วันเริ่มต้นกระบวนการ PR ทั้งหมด (Day 1)</label>' +
+        '<label class="label">วันเริ่มต้นกระบวนการ PR ทั้งหมด (Day 1)</label>' +
         '<input type="date" id="pr-start-date" value="' + esc(p.startDate) + '" style="width:150px;">' +
       '</div>' +
     '</div>' +
