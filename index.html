@@ -28,16 +28,12 @@ header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center
   display: inline-flex; align-items: center; justify-content: center;
 }
 .nav-tab.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.nav-tab .mono { margin-left: 8px; font-weight: 500; opacity: .85; }
 
 .notice { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
-.notice b { font-weight: 600; }
-
 .grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -87,13 +83,15 @@ table.break { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.break td { padding: 6px 0; border-bottom: 1px solid var(--line); }
 table.break td:last-child { text-align: right; font-family: monospace; font-variant-numeric: tabular-nums; }
 table.break tr:last-child td { border-bottom: 0; }
-.scroll-x { overflow-x: auto; }
-table.ref { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
-table.ref th, table.ref td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-table.ref th { color: var(--muted); font-weight: 500; font-size: 12px; }
-table.ref td.n { font-family: monospace; font-variant-numeric: tabular-nums; text-align: right; }
 
-details > summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.hero-counter {
+  background: var(--surface); border: 2px solid var(--accent); border-radius: 8px; padding: 16px 20px;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.hero-num-group { display: flex; align-items: baseline; gap: 8px; }
+.hero-num { font-family: monospace; font-size: 48px; font-weight: 700; color: var(--accent); line-height: 1; }
+.hero-unit { font-size: 18px; font-weight: 600; color: var(--muted); }
+
 .foot { color: var(--muted); font-size: 12px; }
 .savestate { font-size: 12px; color: var(--muted); }
 </style>
@@ -380,7 +378,7 @@ function newTrack(program, daysAgo, stage) {
 }
 function newProfile(name, over) {
   return Object.assign({
-    name, spouse: false, dob: '', targetEvalDate: fmtISO(todayD()), age: 30, caStartDate: '', edu: 4, nocCat: 'none', 
+    name, startDate: fmtISO(todayD()), spouse: false, dob: '', targetEvalDate: fmtISO(todayD()), age: 30, caStartDate: '', edu: 4, nocCat: 'none', 
     highWageExp: 0, highWageJob: 0, lang1: 'en', l1: [9, 9, 9, 9], l2: [0, 0, 0, 0],
     cwe: 1, fw: 0, cert: false, study: 0, sibling: false, pnp: false,
     spEdu: 0, spL: [0, 0, 0, 0], spCwe: 0, tracks: [],
@@ -397,6 +395,7 @@ function normalize(s) {
   s.profiles = s.profiles.slice(0, 2).map((p, i) => {
     const q = Object.assign(newProfile('โปรไฟล์ ' + (i + 1)), p);
     if (!q.targetEvalDate) q.targetEvalDate = fmtISO(todayD());
+    if (!q.startDate) q.startDate = fmtISO(todayD());
     ['l1', 'l2', 'spL'].forEach((k) => { if (!Array.isArray(q[k]) || q[k].length !== 4) q[k] = [0, 0, 0, 0]; });
     q.tracks = (Array.isArray(p.tracks) ? p.tracks : []).filter((t) => t && PROGRAMS[t.program]).map((t) => {
       const base2 = newTrack(t.program);
@@ -421,15 +420,10 @@ function readLocal() {
 function writeLocal() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
 }
-function setSaveNote(t) {
-  const el = document.getElementById('savestate');
-  if (el) el.textContent = t;
-}
 function scheduleSave() {
   touched = true;
   state.example = false;
   writeLocal();
-  setSaveNote('บันทึกในเบราว์เซอร์แล้ว');
   clearTimeout(saveTimer);
 }
 
@@ -640,12 +634,31 @@ function scoreBoxHtml() {
 }
 
 function render() {
+  const p = cur();
+  const startD = parseD(p.startDate || (p.tracks[0] ? p.tracks[0].date : fmtISO(todayD())));
+  const totalElapsedDays = Math.max(0, diffDays(todayD(), startD));
+
   document.getElementById('app').innerHTML =
     '<header class="top"><div><h1>IRCC Progress Tracker</h1><p class="sub">ติดตามสถานะและคำนวณคะแนน CRS ละเอียดยิบทุกขั้นตอน</p></div>' +
     '<div class="nav-tabs">' +
       '<a href="index.html" class="nav-tab active">PR Tracker</a>' +
       '<a href="pharmacist.html" class="nav-tab">Pharmacist Tracker</a>' +
     '</div></header>' +
+
+    '<div class="hero-counter">' +
+      '<div>' +
+        '<div class="label" style="text-transform:uppercase;letter-spacing:.05em;">ยื่นเรื่องและรอดำเนินการมาแล้ว</div>' +
+        '<div class="hero-num-group">' +
+          '<span class="hero-num">' + totalElapsedDays + '</span>' +
+          '<span class="hero-unit">วัน</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">' +
+        '<label class="label">📅 วันเริ่มต้นกระบวนการ PR ทั้งหมด (Day 1)</label>' +
+        '<input type="date" id="pr-start-date" value="' + esc(p.startDate) + '" style="width:150px;">' +
+      '</div>' +
+    '</div>' +
+
     '<div class="notice"><b>ระบบติดตามแบบ Granular:</b> แสดงวันที่คาดการณ์ใน Predict Timeline ล่วงหน้าเรียบร้อยแล้ว</div>' +
     '<div class="grid"><div class="col">' + trackListHtml() + '</div>' +
     '<div class="col"><div class="card" id="scorebox">' + scoreBoxHtml() + '</div>' + crsFormHtml() + refHtml() + '</div></div>' +
@@ -697,7 +710,11 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', (e) => {
   const el = e.target;
-  if (el.dataset.f || el.dataset.t) {
+  if (el.id === 'pr-start-date') {
+    cur().startDate = el.value;
+    scheduleSave();
+    render();
+  } else if (el.dataset.f || el.dataset.t) {
     if (el.dataset.f) setCrsField(el);
     else if (el.dataset.tf) setTrackField(el);
     scheduleSave(); render();
