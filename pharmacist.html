@@ -301,4 +301,52 @@ document.addEventListener('click', (e) => {
 
 render();
 </script>
+<details class="card" id="backup" style="max-width:1120px;margin:16px auto 0">
+  <summary style="cursor:pointer;font-weight:600">สำรอง / ย้ายข้อมูล (ส่งออก - นำเข้า)</summary>
+  <p class="sub">ส่งออก: กดส่งออกแล้วก็อปข้อความไปวางที่อีกเว็บ | นำเข้า: วางข้อความแล้วกดนำเข้า (ข้อมูลเดิมในเบราว์เซอร์นี้จะถูกแทนที่ ทั้ง Pharmacist และ PR Tracker)</p>
+  <textarea id="bk-text" rows="5" style="font-family:monospace;font-size:12px" placeholder="ข้อมูลสำรองจะแสดงที่นี่ หรือวางข้อมูลที่ก็อปมาเพื่อนำเข้า"></textarea>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button type="button" class="btn" id="bk-export">ส่งออกข้อมูล</button>
+    <button type="button" class="btn" id="bk-copy">ก็อป</button>
+    <button type="button" class="btn primary" id="bk-import">นำเข้าข้อมูล</button>
+  </div>
+  <div class="sub" id="bk-msg" role="status"></div>
+</details>
+<script>
+{
+  const KEYS = { pharm: 'pharm-tracker-v4', pr: 'ircc-tracker-v1' };
+  const ta = document.getElementById('bk-text');
+  const msg = document.getElementById('bk-msg');
+  const say = (t) => { msg.textContent = t; };
+  document.getElementById('bk-export').addEventListener('click', () => {
+    const out = {};
+    try { for (const k in KEYS) out[k] = localStorage.getItem(KEYS[k]); } catch (e) { say('อ่านข้อมูลในเบราว์เซอร์ไม่ได้'); return; }
+    ta.value = JSON.stringify(out);
+    say('ส่งออกแล้ว กดก็อป แล้วไปวางในช่องนี้ของอีกเว็บ');
+  });
+  document.getElementById('bk-copy').addEventListener('click', () => {
+    ta.select();
+    try { navigator.clipboard.writeText(ta.value).then(() => say('ก็อปแล้ว'), () => say('ก็อปอัตโนมัติไม่ได้ กด Ctrl+C / Cmd+C แทน')); }
+    catch (e) { say('ก็อปอัตโนมัติไม่ได้ กด Ctrl+C / Cmd+C แทน'); }
+  });
+  document.getElementById('bk-import').addEventListener('click', () => {
+    let data;
+    try { data = JSON.parse(ta.value.trim()); } catch (e) { say('รูปแบบข้อมูลไม่ถูกต้อง'); return; }
+    if (!data || typeof data !== 'object') { say('รูปแบบข้อมูลไม่ถูกต้อง'); return; }
+    let n = 0;
+    try {
+      for (const k in KEYS) {
+        let v = data[k];
+        if (v == null || v === '') continue;
+        if (typeof v !== 'string') v = JSON.stringify(v);
+        JSON.parse(v);
+        localStorage.setItem(KEYS[k], v); n++;
+      }
+    } catch (e) { say('นำเข้าไม่สำเร็จ: ' + e.message); return; }
+    if (!n) { say('ไม่พบข้อมูลที่นำเข้าได้'); return; }
+    say('นำเข้าแล้ว กำลังโหลดหน้าใหม่...');
+    setTimeout(() => { try { location.reload(); } catch (e) { say('นำเข้าแล้ว กรุณารีเฟรชหน้า'); } }, 400);
+  });
+}
+</script>
 </body></html>
