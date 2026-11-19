@@ -159,6 +159,17 @@ function writeState(s) {
 }
 
 let state = readState();
+if (!state.targets || typeof state.targets !== 'object') state.targets = {};
+
+function targetInput(i) {
+  return '<input type="date" data-act="target" data-stage="' + i + '" value="' + esc(state.targets[i] || '') + '" title="วันเป้าหมาย">';
+}
+function vsTarget(actual, target) {
+  if (!actual || !target) return '';
+  const d = diffDays(parseD(actual), parseD(target));
+  if (d === 0) return ' <span class="sub">(ตรงเป้า)</span>';
+  return ' <span class="sub">(' + (d < 0 ? 'เร็วกว่าเป้า ' + (-d) : 'ช้ากว่าเป้า ' + d) + ' วัน)</span>';
+}
 
 function render() {
   const idx = Math.min(Math.max(state.stage, 0), PHARM_STAGES.length - 1);
@@ -183,7 +194,7 @@ function render() {
 
   const historyHtml = historyItems.map(h => {
     const stName = PHARM_STAGES[h.stage] ? PHARM_STAGES[h.stage].label : 'ขั้นตอนที่ ' + h.stage;
-    return '<div class="timeline-item"><span>Done: <b>' + esc(stName) + '</b></span>' +
+    return '<div class="timeline-item"><span>Done: <b>' + esc(stName) + '</b>' + vsTarget(h.date, state.targets[h.stage]) + '</span>' +
       '<div style="display:flex;gap:6px;align-items:center;">' +
       '<input type="date" data-act="edit-date" data-stage="' + h.stage + '" value="' + esc(h.date) + '">' +
       '<button class="btn ghost small" style="min-height:32px;width:32px;padding:0;" data-act="del-history" data-stage="' + h.stage + '" title="ลบ">Del</button>' +
@@ -193,7 +204,10 @@ function render() {
   let remainingHtml = '';
   let accumMin = 0;
   let accumMax = 0;
-  const baseDate = parseD(state.date || fmtISO(todayD()));
+  // A target date (e.g. a booked exam) overrides the prediction and re-anchors the stages after it
+  const curTarget = state.targets[idx];
+  let baseMin = parseD(curTarget || state.date || fmtISO(todayD()));
+  let baseMax = baseMin;
 
   for (let i = idx + 1; i < PHARM_STAGES.length; i++) {
     const stObj = PHARM_STAGES[i];
@@ -201,14 +215,24 @@ function render() {
     accumMin += w[0];
     accumMax += w[1];
 
-    const predFrom = addDays(baseDate, accumMin);
-    const predTo = addDays(baseDate, accumMax);
-    const dateStr = fmtSpan(predFrom, predTo);
+    const tgt = state.targets[i];
+    let dateStr, chipLabel, chipColor;
+    if (tgt) {
+      baseMin = baseMax = parseD(tgt);
+      accumMin = accumMax = 0;
+      dateStr = parseD(tgt).toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' });
+      chipLabel = 'เป้าหมาย: '; chipColor = 'var(--warn)';
+    } else {
+      dateStr = fmtSpan(addDays(baseMin, accumMin), addDays(baseMax, accumMax));
+      chipLabel = 'คาดว่า: '; chipColor = 'var(--accent)';
+    }
 
-    remainingHtml += '<div class="timeline-item" style="opacity:0.9; border-left:3px solid var(--accent);">' +
+    remainingHtml += '<div class="timeline-item" style="opacity:0.95; border-left:3px solid ' + chipColor + ';">' +
       '<span>Pending: <b>' + esc(stObj.label) + '</b></span>' +
-      '<span class="mono" style="font-size:12px;background:var(--surface);padding:3px 8px;border-radius:4px;border:1px solid var(--line);color:var(--accent);font-weight:600;">คาดว่า: ' + dateStr + '</span>' +
-      '</div>';
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+      '<span class="mono" style="font-size:12px;background:var(--surface);padding:3px 8px;border-radius:4px;border:1px solid var(--line);color:' + chipColor + ';font-weight:600;">' + chipLabel + dateStr + '</span>' +
+      targetInput(i) +
+      '</div></div>';
   }
 
   const mainHtml = 
@@ -231,7 +255,9 @@ function render() {
     '<div class="row">' +
       '<div class="field" style="grid-column: span 2;"><label class="label">ขั้นตอนปัจจุบัน (' + (idx + 1) + '/' + PHARM_STAGES.length + ')</label><select id="stage-select">' + PHARM_STAGES.map((s, i) => opt(i, s.label, idx)).join('') + '</select></div>' +
       '<div class="field"><label class="label">วันที่อัปเดตสเต็ปนี้</label><input type="date" id="date-input" value="' + esc(state.date) + '"></div>' +
+      '<div class="field"><label class="label">วันเป้าหมายขั้นนี้ (เช่น วันสอบ)</label>' + targetInput(idx) + '</div>' +
     '</div>' +
+    (curTarget ? '<div class="sub">' + (diffDays(parseD(curTarget), nowD) >= 0 ? 'อีก <b>' + diffDays(parseD(curTarget), nowD) + '</b> วันถึงวันเป้าหมาย' : 'เลยวันเป้าหมายมา ' + (-diffDays(parseD(curTarget), nowD)) + ' วัน') + '</div>' : '') +
     '<ol class="steps">' + dots + '</ol>' +
     '<button class="btn primary small" id="btn-complete">ทำขั้นตอนนี้เรียบร้อยแล้ว (เลื่อนไปขั้นถัดไปและบันทึก)</button>' +
     '<div class="field"><label class="label">บันทึกเพิ่มเติม</label><textarea id="note-input">' + esc(state.note) + '</textarea></div>' +
@@ -261,6 +287,12 @@ document.addEventListener('change', (e) => {
   }
   else if (el.id === 'start-date-input') {
     state.startDate = el.value;
+    writeState(state);
+    render();
+  }
+  else if (el.dataset.act === 'target') {
+    const st = Number(el.dataset.stage);
+    if (el.value) state.targets[st] = el.value; else delete state.targets[st];
     writeState(state);
     render();
   }

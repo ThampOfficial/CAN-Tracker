@@ -270,7 +270,15 @@ function computeCRS(p) {
   const first = p.l1.reduce((s, v) => s + l1Pts(v, sp), 0);
   const second = Math.min(sp ? 22 : 24, p.l2.reduce((s, v) => s + l2Pts(v), 0));
   const cwe = (sp ? CWE_SPOUSE : CWE_SINGLE)[clamp(num(effectiveCwe), 0, 5)];
-  const core = age + edu + first + second + cwe;
+  const core = age + edu + first + second;
+
+  // Labour Market Integration (from 3 Nov 2026): higher of
+  // (Canadian work exp + high-wage exp bonus, cap 150/140) or (high-wage job offer, cap 100) — never both
+  const expBonus = num(effectiveCwe) >= 1 ? num(p.highWageExp || 0) : 0;
+  const expRoute = Math.min(sp ? 140 : 150, cwe + expBonus);
+  const jobRoute = Math.min(100, num(p.highWageJob || 0));
+  const lmiUsesJob = jobRoute > expRoute;
+  const lmi = Math.max(expRoute, jobRoute);
 
   let spouse = 0;
   if (sp) {
@@ -306,14 +314,14 @@ function computeCRS(p) {
   const sibling = p.sibling ? 15 : 0;
   const pnp = p.pnp ? 600 : 0;
   
-  const selectedHighWageBonus = Math.max(num(p.highWageExp || 0), num(p.highWageJob || 0));
-  const additional = Math.min(600, french + study + sibling + pnp + selectedHighWageBonus);
+  const additional = Math.min(600, french + study + sibling + pnp);
 
   return {
     age, edu, first, second, cwe, core, spouse, transfer, transferParts,
-    french, study, sibling, pnp, selectedHighWageBonus, additional,
+    french, study, sibling, pnp, additional,
+    expBonus, expRoute, jobRoute, lmi, lmiUsesJob,
     effectiveAge, effectiveCwe, evalDate,
-    total: core + spouse + transfer + additional,
+    total: core + spouse + transfer + lmi + additional,
   };
 }
 
@@ -614,10 +622,12 @@ function crsFormHtml() {
 
 function breakdownRows(c, p) {
   const r = (a, b) => '<tr><td>' + a + '</td><td>' + b + '</td></tr>';
-  let h = r('อายุ', c.age) + r('การศึกษา', c.edu) + r('ภาษาแรก', c.first) + r('ภาษาที่สอง', c.second) + r('งานแคนาดา', c.cwe) + r('<b>รวมส่วนหลัก</b>', '<b>' + c.core + '</b>');
+  let h = r('อายุ', c.age) + r('การศึกษา', c.edu) + r('ภาษาแรก', c.first) + r('ภาษาที่สอง', c.second) + r('<b>รวมส่วนหลัก</b>', '<b>' + c.core + '</b>');
+  h += r('งานแคนาดา (' + c.effectiveCwe + ' ปี)', c.cwe) + r('โบนัส High-wage (งานแคนาดา)', '+' + c.expBonus);
+  if (c.jobRoute > 0) h += r('Job Offer High-wage (ใช้ทางที่สูงกว่า ไม่บวกกัน)', c.jobRoute);
+  h += r('<b>Labour Market Integration' + (c.lmiUsesJob ? ' (ใช้ Job Offer)' : '') + '</b>', '<b>' + c.lmi + '</b>');
   if (p.spouse) h += r('คู่สมรส', c.spouse);
   h += r('Skill transferability', c.transfer) + r('ภาษาฝรั่งเศส', c.french) + r('เรียนแคนาดา', c.study) + r('พี่น้อง', c.sibling) + r('PNP', c.pnp);
-  if (c.selectedHighWageBonus > 0) h += r('โบนัส High-wage พ.ย. 2026', '+' + c.selectedHighWageBonus);
   return h;
 }
 
